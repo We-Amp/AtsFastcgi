@@ -191,9 +191,12 @@ void fcgi_process_buffer(uchar *beg_buf, uchar *end_buf,
 
        if( fcgi_process_record(&beg_buf, end_buf, h) == FCGI_PROCESS_DONE ){
            /*fprintf(stderr, "TYPE%d:LEN:%d\n", h->header->type, h->length);*/
-           if(h->header->type == FCGI_STDOUT)
+           printf("\nWithin processing record");
+           if(h->header->type == FCGI_STDOUT){
+                printf("\n\nwriting to stdout stream\n\n");
                 for(i=0;i < h->length; i++)
                     fprintf(stdout, "%c", ((uchar *)h->content)[i]);
+            }
        }
 
         if ( beg_buf == end_buf )
@@ -202,7 +205,7 @@ void fcgi_process_buffer(uchar *beg_buf, uchar *end_buf,
 }
 
 size_t fcgi_process_buffer_new(uchar *beg_buf, uchar *end_buf,
-    fcgi_record_list** head, uchar **output){
+    fcgi_record_list** head, uchar **output,int64_t totalDataLen){
 
  fcgi_record* tmp, *h;
  size_t i;
@@ -226,11 +229,16 @@ size_t fcgi_process_buffer_new(uchar *beg_buf, uchar *end_buf,
         /*fprintf(stderr, "TYPE%d:LEN:%d\n", h->header->type, h->length);*/
         if(h->header->type == FCGI_STDOUT) {
             total_length = h->length;
-            *output = malloc(sizeof(size_t)*total_length);
-            printf("\nOffset is : %zu\n", h->offset);
-            for(i=0;i < h->length; i++) {
-                 (*output)[i] = ((uchar *)h->content)[i];
-            }
+            *output = malloc(sizeof(size_t)*h->length);
+            printf("\nOffset is : %zu, Length: %zu , ContentAddr: %p \n", h->offset,h->length,&h->content);
+            //printf("\nCopying data to output buffer");
+            memcpy(*output,h->content,total_length);
+            printf("output content:\n");
+            // for( i=0;i < total_length;i++){
+            //  printf("%c",(*output)[i]);
+            // }
+            printf("\nDone...\n");
+            //return total_length;
         }
     }
 
@@ -238,6 +246,48 @@ size_t fcgi_process_buffer_new(uchar *beg_buf, uchar *end_buf,
         return total_length;
      }
  }
+}
+
+char * fcgi_process_buffer_temp(uchar *beg_buf, uchar *end_buf,
+    fcgi_record_list** head){
+        fcgi_record* tmp, *h;
+        size_t i;
+        char *outputBuf=NULL;
+       
+        if(*head == NULL)
+            *head = fcgi_record_create();
+        h = *head;
+       
+        while(1)
+        {  
+            //printf("\nInside process Buffer while loop");
+            if( h->state == fcgi_state_done )
+            {
+                tmp = h;
+                *head = fcgi_record_create();
+                h = *head;
+                h->next = tmp;
+            }
+       
+           if( fcgi_process_record(&beg_buf, end_buf, h) == FCGI_PROCESS_DONE ){
+               /*fprintf(stderr, "TYPE%d:LEN:%d\n", h->header->type, h->length);*/
+                if(h->header->type == FCGI_STDOUT){
+                     printf("\n\nwriting to stdout stream\n\n");
+                     for(i=0;i < h->length; i++)
+                         fprintf(stdout, "%c", ((uchar *)h->content)[i]);
+                }
+               
+               
+           }
+       
+           
+            if ( beg_buf == end_buf ) {
+               printf("\nReturn Val...total_length");
+               return outputBuf;
+               //return;
+            }
+        }
+
 }
 
 void serialize(uchar* buffer, void *st, size_t size){
