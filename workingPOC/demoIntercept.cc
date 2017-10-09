@@ -383,10 +383,6 @@ InterceptTransferData(InterceptIO *from, InterceptIO *to, const char *hostSide)
   size_t len(0);
   
   std::string string_output;
-  //string_output = "HTTP/1.0 200 OK\r\n";
-  //rbuf = (unsigned char *)malloc(BUF_SIZE);
-  
-  
 
   // Walk the list of buffer blocks in from the read VIO.
   for (block = TSIOBufferReaderStart(from->readio.reader); block; block = TSIOBufferBlockNext(block)) {
@@ -399,36 +395,14 @@ InterceptTransferData(InterceptIO *from, InterceptIO *to, const char *hostSide)
     // the buffer of the write VIO.
     ptr = TSIOBufferBlockReadStart(block, from->readio.reader, &remain);
     if(strcmp(hostSide,"<server>")==0){
-
-      //std::cout<< "\nserver transfer data."<<std::endl;
-      std::cout << "Before process buffer String Data is: " << std::string((char *)ptr, remain) << std::endl;
-      //*output = NULL;
-      len = fcgi_process_buffer_new((uchar *)ptr, (uchar *)ptr + (size_t)remain, &rlst, &output,remain);
-      //fcgi_process_buffer((uchar *)ptr, (uchar *)ptr + (size_t)remain, &rlst);
-      //printf("\nLength of processed buffer: %d",len);
-      // if (len>=0) {
-      //   //string_output +=  std::string((char *)output, len);
-      //   //std::cout << "New String Data is: " << string_output << std::endl;
-      //   // ptr = (const char *)output;
-      //   // remain = len;
-      //   ptr    = string_output.c_str();
-      //   //remain = string_output.length();
-      // }
+        if(remain==0)
+          break;
         
         printf("\ncopying chunk block to tempBuf");
         consumed = remain;
-        memcpy(tempBuf+tempLength,ptr,len);
-        tempLength += len;
-        // consumed = len;
-        // while (ptr && remain) {
-        //   int64_t nbytes;
-        //   nbytes = len;
-        //   //nbytes = TSIOBufferWrite(to->writeio.iobuf, ptr, remain);
-        //   remain -= nbytes;
-        //   ptr += nbytes;
-        //   consumed += nbytes;
-        //   printf("\nwithin loop");
-        // }
+        memcpy(tempBuf+tempLength,ptr,remain);
+        std::cout<<"\n\n\nCopied Data:  "<<std::string((char *)ptr,remain)<<std::endl;
+        tempLength += remain;
    
     }else{
         std::cout<< "client transfer data"<<std::endl;
@@ -632,9 +606,8 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
 
 
     const char *temphostSide = InterceptProxySide(cdata.istate, from);
-    printf("\ntempHostSide: %s",temphostSide);
+    std::cout<<"\nProcessing to FCGI"<<std::endl;
     if( strcmp(temphostSide , "<server>" ) == 0 ){
-      fcgi_record_list *rlst = NULL;
       int64_t consumed = 0;
       int64_t remain = 0;
       const char *ptr;
@@ -642,19 +615,13 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
       size_t len(0);
       std::string string_output;
       string_output = "HTTP/1.0 200 OK\r\n";
-      //rbuf = (unsigned char *)malloc(BUF_SIZE*100);
-      printf("\nEnd of stream is reached");
-      std::cout<< "\nserver transfer data."<<std::endl;
-      std::cout << "Before process buffer String Data is: " << std::string((char *)tempBuf, tempLength) << std::endl;
+      len = fcgi_process_buffer_new(tempBuf, tempBuf + (size_t)tempLength, &rlst, &rbuf,tempLength);
 
-      //len = fcgi_process_buffer_new((uchar *)tempBuf, (uchar *)tempBuf + (size_t)tempLength, &rlst, &rbuf,tempLength);
-      //printf("\nLength of processed buffer: %d",len);
-      //if (len!=-1) {
-        //string_output +=  std::string((char *)rbuf, len);
-        string_output +=  std::string((char *)tempBuf,tempLength);
-        ptr    = string_output.c_str();
-        remain = string_output.length();
-      //}  
+      std::cout<<"\n3.Processing to FCGI"<<std::endl;
+      string_output +=  std::string((char *)rbuf,len);
+      ptr    = string_output.c_str();
+      remain = string_output.length();
+      std::cout<<"EOS Reached--->> Response to client: \n"<<string_output<<std::endl;
       while (ptr && remain) {
         int64_t nbytes;
         nbytes = TSIOBufferWrite(to->writeio.iobuf, ptr, remain);
@@ -662,8 +629,6 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
         ptr += nbytes;
         consumed += nbytes;
       }
-      
-      //fcgi_process_buffer((uchar *)tempBuf, (uchar *)tempBuf + (size_t)tempLength, &rlst);
     }
 
     // Close the side that we received the EOS event from.

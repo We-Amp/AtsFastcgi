@@ -48,6 +48,8 @@ fcgi_record* fcgi_record_create()
     tmp->header = (fcgi_header *) calloc(sizeof(fcgi_header), 1);
     tmp->next = NULL;
     tmp->state = 0;
+    //tmp->offset = 0;
+    //tmp->length = 0;
     return tmp;
 }
 
@@ -111,7 +113,7 @@ int fcgi_process_content(uchar **beg_buf, uchar *end_buf,
 
     if ( *state == fcgi_state_padding ){
         *state = fcgi_state_done;
-        /*printf("padding %d\n", (int)rec->length - (int)offset + (int)h->padding_len);*/
+        printf("padding %d\n", (int)rec->length - (int)offset + (int)h->padding_len);
         *beg_buf += (size_t) ((int)rec->length - (int)offset + (int)h->padding_len);
         return FCGI_PROCESS_DONE;
     }
@@ -152,21 +154,25 @@ int fcgi_process_content(uchar **beg_buf, uchar *end_buf,
 int fcgi_process_record(uchar **beg_buf, uchar *end_buf, fcgi_record *rec){
 
         int rv;
+        printf("\nFCGI process records.1");
         while(rec->state < fcgi_state_content_begin)
         {
             if((rv = fcgi_process_header(**beg_buf, rec)) == FCGI_PROCESS_ERR)
                     return FCGI_PROCESS_ERR;
             (*beg_buf)++;
-            if( *beg_buf == end_buf )
+            if( *beg_buf == end_buf ){
+                printf("\nFCGI process records.2");
                 return FCGI_PROCESS_AGAIN;
+            }
         }
+        printf("\nFCGI process records.3");
         if(rec->state == fcgi_state_content_begin)
         {
            rec->length = fcgi_header_get_content_len(rec->header);
            rec->content = malloc(rec->length);
            rec->state++;
         }
-
+        printf("\nFCGI process records.4");
         return fcgi_process_content(beg_buf, end_buf, rec);
 }
 
@@ -214,7 +220,6 @@ size_t fcgi_process_buffer_new(uchar *beg_buf, uchar *end_buf,
  h = *head;
 
  size_t total_length = 0;
-
  while(1)
  {
      if( h->state == fcgi_state_done )
@@ -224,20 +229,21 @@ size_t fcgi_process_buffer_new(uchar *beg_buf, uchar *end_buf,
          h = *head;
          h->next = tmp;
      }
-
+     printf("\nBefore process records.");
     if( fcgi_process_record(&beg_buf, end_buf, h) == FCGI_PROCESS_DONE ){
         /*fprintf(stderr, "TYPE%d:LEN:%d\n", h->header->type, h->length);*/
+        printf("\nInside process records.");
         if(h->header->type == FCGI_STDOUT) {
             total_length = h->length;
             *output = malloc(sizeof(size_t)*h->length);
             printf("\nOffset is : %zu, Length: %zu , ContentAddr: %p \n", h->offset,h->length,&h->content);
             //printf("\nCopying data to output buffer");
             memcpy(*output,h->content,total_length);
-            printf("output content:\n");
+            //printf("output content:\n");
             // for( i=0;i < total_length;i++){
             //  printf("%c",(*output)[i]);
             // }
-            printf("\nDone...\n");
+            
             //return total_length;
         }
     }
