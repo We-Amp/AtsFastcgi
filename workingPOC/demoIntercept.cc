@@ -71,7 +71,7 @@ extern "C" {
 
 #define N_NameValue 27
 fcgi_name_value nvs[N_NameValue] = {
-  {"SCRIPT_FILENAME", "/var/www/html/abc.php"},
+  {"SCRIPT_FILENAME","/var/www/html/abc.php" },
   {"SCRIPT_NAME", "/abc.php"},
   {"DOCUMENT_ROOT", "/"},
   {"REQUEST_URI", "/abc.php"},
@@ -355,6 +355,7 @@ InterceptShouldInterceptRequest(TSHttpTxn txnp)
       retv = findSubstr(url_str, php_str);
       if (retv > -1) {
         VDEBUG("Found the substring at position %d Intercepting URL: %s\n", retv, url_str);
+        const char *urlPath = TSUrlPathGet(bufp,url_loc,&url_length);
       } else {
         retv = 0;
         VDEBUG("You are forbidden from intercepting url: \"%s\"\n", url_str);
@@ -367,8 +368,8 @@ InterceptShouldInterceptRequest(TSHttpTxn txnp)
 }
 
 unsigned char *tempBuf = (unsigned char*)malloc(BUF_SIZE*100);
-static size_t tempLength(0);
-fcgi_record_list *rlst = NULL;
+size_t tempLength(0);
+
 // This function is called in response to a READ_READY event. We
 // should transfer any data we find from one side of the transfer
 // to the other.
@@ -378,9 +379,6 @@ InterceptTransferData(InterceptIO *from, InterceptIO *to, const char *hostSide)
   TSIOBufferBlock block;
   int64_t consumed = 0;
   
-  uchar *output;
-  unsigned char *rbuf;
-  size_t len(0);
   
   std::string string_output;
 
@@ -390,20 +388,16 @@ InterceptTransferData(InterceptIO *from, InterceptIO *to, const char *hostSide)
     const char *ptr;
 
     VDEBUG("attempting to transfer %" PRId64 " available bytes", TSIOBufferBlockReadAvail(block, from->readio.reader));
-
     // Take the data from each buffer block, and write it into
     // the buffer of the write VIO.
     ptr = TSIOBufferBlockReadStart(block, from->readio.reader, &remain);
     if(strcmp(hostSide,"<server>")==0){
         if(remain==0)
           break;
-        
-        printf("\ncopying chunk block to tempBuf");
         consumed = remain;
         memcpy(tempBuf+tempLength,ptr,remain);
-        std::cout<<"\n\n\nCopied Data:  "<<std::string((char *)ptr,remain)<<std::endl;
         tempLength += remain;
-   
+  
     }else{
         std::cout<< "client transfer data"<<std::endl;
         while (ptr && remain) {
@@ -417,7 +411,7 @@ InterceptTransferData(InterceptIO *from, InterceptIO *to, const char *hostSide)
      }
   }
 
-    VDEBUG("consumed %" PRId64 " bytes reading from vc=%p, writing to vc=%p", consumed, from->vc, to->vc);
+  VDEBUG("consumed %" PRId64 " bytes reading from vc=%p, writing to vc=%p", consumed, from->vc, to->vc);
   if (consumed) {
     TSIOBufferReaderConsume(from->readio.reader, consumed);
     // Note that we don't have to call TSIOBufferProduce here.
@@ -604,20 +598,19 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
 
     VIODEBUG(arg.vio, "received EOS or ERROR from %s side", InterceptProxySideVC(cdata.istate, vc));
 
-
     const char *temphostSide = InterceptProxySide(cdata.istate, from);
-    std::cout<<"\nProcessing to FCGI"<<std::endl;
     if( strcmp(temphostSide , "<server>" ) == 0 ){
       int64_t consumed = 0;
       int64_t remain = 0;
       const char *ptr;
       uchar *rbuf;
       size_t len(0);
+      fcgi_record_list *rlst = NULL;
       std::string string_output;
       string_output = "HTTP/1.0 200 OK\r\n";
-      len = fcgi_process_buffer_new(tempBuf, tempBuf + (size_t)tempLength, &rlst, &rbuf,tempLength);
+      rbuf = (uchar *)malloc(sizeof(size_t)*tempLength);
 
-      std::cout<<"\n3.Processing to FCGI"<<std::endl;
+      len = fcgi_process_buffer_new(tempBuf, tempBuf + (size_t)tempLength, &rlst, &rbuf,tempLength);
       string_output +=  std::string((char *)rbuf,len);
       ptr    = string_output.c_str();
       remain = string_output.length();
@@ -629,6 +622,9 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
         ptr += nbytes;
         consumed += nbytes;
       }
+      delete rbuf;
+      delete rlst,tempBuf;
+      tempLength = 0;
     }
 
     // Close the side that we received the EOS event from.

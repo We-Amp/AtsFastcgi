@@ -55,6 +55,4 @@ void fcgi_process_buffer(uchar *beg_buf,uchar *end_buf,
 size_t fcgi_process_buffer_new(uchar *beg_buf, uchar *end_buf,
             fcgi_record_list** head, uchar **output,int64_t totalDataLen);
 
-char * fcgi_process_buffer_temp(uchar *beg_buf, uchar *end_buf,
-            fcgi_record_list** head);
 #endif
