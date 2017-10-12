@@ -494,6 +494,13 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
     VIODEBUG(istate->server.writeio.vio, "started %s write", InterceptProxySide(istate, &istate->server));
     return TS_EVENT_NONE;
   }
+  case TS_EVENT_NET_CONNECT_FAILED:{
+    //argument_type cdata(TSContDataGet(contp));
+    VDEBUG("Cancelling PHP request for txn=%p", originalTxn);
+    TSVConnAbort(clientvc, TS_VC_CLOSE_ABORT);
+    TSContDestroy(contp);
+    return TS_EVENT_NONE;
+  }
   case TS_EVENT_NET_ACCEPT: {
     // Set up the server intercept. We have the original
     // TSHttpTxn from the continuation. We need to connect to the
@@ -603,6 +610,13 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
   }
 
   case TS_EVENT_ERROR:
+  {
+    VDEBUG("Cancelling PHP request for txn=%p", originalTxn);
+    TSVConnAbort(clientvc, TS_VC_CLOSE_ABORT);
+    TSContDestroy(contp);
+    return TS_EVENT_NONE;
+
+  }
   case TS_EVENT_VCONN_EOS: {
     // If we get an EOS on one side, we should just send and EOS
     // on the other side too. The server intercept will always
