@@ -69,6 +69,10 @@ extern "C" {
 #define FCGI_SERVER "127.0.0.1"
 #define MAXDATASIZE 1000
 
+std::string phpDir = "/var/www/html/";
+std::string scriptFile =  "abc.php";
+std::string phpScriptFile;// = phpDir + scriptFile;
+
 #define N_NameValue 27
 fcgi_name_value nvs[N_NameValue] = {
   {"SCRIPT_FILENAME","/var/www/html/abc.php" },
@@ -350,18 +354,36 @@ InterceptShouldInterceptRequest(TSHttpTxn txnp)
   if (TSHttpTxnClientReqGet(txnp, &bufp, &offset_loc) == TS_SUCCESS) {
     req_status = TSHttpHdrUrlGet(bufp, offset_loc, &url_loc);
     if (req_status == TS_SUCCESS) {
+      url_length = 0;
       url_str = TSUrlStringGet(bufp, url_loc, &url_length);
       // check wheather to intercept the request
       retv = findSubstr(url_str, php_str);
       if (retv > -1) {
-        VDEBUG("Found the substring at position %d Intercepting URL: %s\n", retv, url_str);
+        VDEBUG("Found the substring at position %d Intercepting URL: %s URLLOc: %d\n", retv, url_str,url_loc);
         const char *urlPath = TSUrlPathGet(bufp,url_loc,&url_length);
+        fcgi_name_value *ptr;
+        ptr = nvs;
+        int i=0;
+        for(i=0;i<N_NameValue;i++){
+          if(strcmp(nvs[i].name,"SCRIPT_FILENAME")==0){
+            (ptr+i)->value =NULL;
+            phpScriptFile.clear();
+            std::cout<<"\nURL Path: "<<urlPath;
+            printf("\nBefore  FIle Name: %s ,phpScriptFile: %s \n\n",(ptr+i)->value,phpScriptFile.c_str());
+            phpScriptFile = phpDir + std::string(urlPath,strlen(urlPath));
+            (ptr+i)->value = (char*)malloc(sizeof(char)*phpScriptFile.length());
+            strcpy((ptr+i)->value, phpScriptFile.c_str());
+            printf("\nNew FIle Name: %s \n\n",(ptr+i)->value);
+            break;
+          }
+        }
       } else {
         retv = 0;
         VDEBUG("You are forbidden from intercepting url: \"%s\"\n", url_str);
       }
       TSfree(url_str);
     }
+    TSHandleMLocRelease(bufp, TS_NULL_MLOC, url_loc);
     TSHandleMLocRelease(bufp, TS_NULL_MLOC, offset_loc);
   }
   return retv;
