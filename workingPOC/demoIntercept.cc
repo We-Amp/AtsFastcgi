@@ -71,7 +71,7 @@ extern "C" {
 
 std::string phpDir = "/var/www/html/";
 std::string scriptFile =  "abc.php";
-std::string phpScriptFile;// = phpDir + scriptFile;
+std::string phpScriptFile;
 
 #define N_NameValue 27
 fcgi_name_value nvs[N_NameValue] = {
@@ -166,8 +166,8 @@ struct InterceptIOChannel {
     fcgi_header *head;
     fcgi_begin_request *begin_req = create_begin_request(req_id);
 
-    
-    buf  = (unsigned char *)malloc(BUF_SIZE);
+ 
+    buf  = (unsigned char *)TSmalloc(BUF_SIZE);
     p    = buf;
     serialize(p, begin_req->header, sizeof(fcgi_header));
     p += sizeof(fcgi_header);
@@ -371,7 +371,7 @@ InterceptShouldInterceptRequest(TSHttpTxn txnp)
             std::cout<<"\nURL Path: "<<urlPath;
             printf("\nBefore  FIle Name: %s ,phpScriptFile: %s \n\n",(ptr+i)->value,phpScriptFile.c_str());
             phpScriptFile = phpDir + std::string(urlPath,strlen(urlPath));
-            (ptr+i)->value = (char*)malloc(sizeof(char)*phpScriptFile.length());
+            (ptr+i)->value = (char*)TSmalloc(sizeof(char)*phpScriptFile.length());
             strcpy((ptr+i)->value, phpScriptFile.c_str());
             printf("\nNew FIle Name: %s \n\n",(ptr+i)->value);
             break;
@@ -389,7 +389,7 @@ InterceptShouldInterceptRequest(TSHttpTxn txnp)
   return retv;
 }
 
-unsigned char *tempBuf = (unsigned char*)malloc(BUF_SIZE*100);
+unsigned char *tempBuf = (unsigned char*)TSmalloc(BUF_SIZE*100);
 size_t tempLength(0);
 
 // This function is called in response to a READ_READY event. We
@@ -608,14 +608,13 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
     InterceptAttemptDestroy(cdata.istate, contp);
     return TS_EVENT_NONE;
   }
-
   case TS_EVENT_ERROR:
   {
     VDEBUG("Cancelling PHP request for txn=%p", originalTxn);
+    argument_type cdata = TSContDataGet(contp);
     TSVConnAbort(clientvc, TS_VC_CLOSE_ABORT);
-    TSContDestroy(contp);
+    InterceptAttemptDestroy(cdata.istate, contp);
     return TS_EVENT_NONE;
-
   }
   case TS_EVENT_VCONN_EOS: {
     // If we get an EOS on one side, we should just send and EOS
@@ -635,6 +634,8 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
     VIODEBUG(arg.vio, "received EOS or ERROR from %s side", InterceptProxySideVC(cdata.istate, vc));
 
     const char *temphostSide = InterceptProxySide(cdata.istate, from);
+    //IFF proxyside is server, we'll be Checking the Server VConnRead state. On server VConnRead EOS, 
+    //we'll start decoding the php server data and then write it down to client side.
     if( strcmp(temphostSide , "<server>" ) == 0 ){
       int64_t consumed = 0;
       int64_t remain = 0;
@@ -644,7 +645,7 @@ InterceptInterceptionHook(TSCont contp, TSEvent event, void *edata)
       fcgi_record_list *rlst = NULL;
       std::string string_output;
       string_output = "HTTP/1.0 200 OK\r\n";
-      rbuf = (uchar *)malloc(sizeof(size_t)*tempLength);
+      rbuf = (uchar *)TSmalloc(sizeof(size_t)*tempLength);
 
       len = fcgi_process_buffer_new(tempBuf, tempBuf + (size_t)tempLength, &rlst, &rbuf,tempLength);
       string_output +=  std::string((char *)rbuf,len);
