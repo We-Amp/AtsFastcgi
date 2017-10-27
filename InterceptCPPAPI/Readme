@@ -1,0 +1,2 @@
+Build and Install cmd = 
+/home/rahul/GDBTech/ATS/opt/ts-7.1/bin/tsxs -o demoRedirect.so -c demoRedirect.cc -L /home/rahul/GDBTech/ATS/opt/ts-7.1/lib/ -I /home/rahul/GDBTech/ATS/trafficserver-7.1.1/lib/ -I /home/rahul/GDBTech/ATS/trafficserver-7.1.1/lib/cppapi/include/ -latscppapi && sudo /home/rahul/GDBTech/ATS/opt/ts-7.1/bin/tsxs -o demoRedirect.so -i
