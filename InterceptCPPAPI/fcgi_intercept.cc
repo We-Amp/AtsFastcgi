@@ -2,6 +2,8 @@
 #include <string>
 #include "fcgi_intercept.h"
 #include <netinet/in.h>
+#include "ats_mod_fcgi.h"
+using namespace fcgiGlobal;
 
 void FastCGIIntercept::consume(const string &data, InterceptPlugin::RequestDataType type)
 {
@@ -13,11 +15,11 @@ void FastCGIIntercept::handleInputComplete(){
     server->contp_ = initServer();
  }
 
-void FastCGIIntercept::handleInputComplete1(){
+void FastCGIIntercept::writeResponseChunkToATS(){
      InterceptPlugin::produce(server->serverResponse);
 }
 
-void FastCGIIntercept::setOutputComplete(){
+void FastCGIIntercept::setResponseOutputComplete(){
     InterceptPlugin::setOutputComplete();
 }
 
@@ -70,9 +72,8 @@ static int handlePHPConnectionEvents(TSCont contp,TSEvent event, void *edata)
   case TS_EVENT_VCONN_READ_READY:
   {
     cout << "handlePHPConnectionEvents: Inside Read Ready...VConn Open " << endl;
-    int64_t nbytes;
-    nbytes = InterceptTransferData(server);
-    fcgi->handleInputComplete1();
+    InterceptTransferData(server);
+    fcgi->writeResponseChunkToATS();
     break;
   }
 
@@ -89,10 +90,9 @@ static int handlePHPConnectionEvents(TSCont contp,TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_EOS:{
     cout<<"handlePHPConnectionEvents: Sending Response to client side"<<endl;
-    int64_t nbytes;
-    nbytes = InterceptTransferData(server);
-    fcgi->handleInputComplete1();
-    fcgi->setOutputComplete();
+    InterceptTransferData(server);
+    fcgi->writeResponseChunkToATS();
+    fcgi->setResponseOutputComplete();
     return TS_EVENT_NONE;
   }break;
   case TS_EVENT_ERROR:
@@ -108,22 +108,29 @@ static int handlePHPConnectionEvents(TSCont contp,TSEvent event, void *edata)
 }
 
 TSCont FastCGIIntercept::initServer(){
-    TSAction action;
     TSCont contp;
     struct sockaddr_in ip_addr;
-    server_ip = (127 << 24) | (0 << 16) | (0 << 8) | (1);
-    server_ip = htonl(server_ip);
-    server_port = htons(PORT);
-  
+    // server_ip = (127 << 24) | (0 << 16) | (0 << 8) | (1);
+    // server_ip = htonl(server_ip);
+    // server_port = htons(PORT);
+    unsigned short int a,b,c,d,p;
+    char *arr = plugin_data->global_config->server_ip;
+    char *port = plugin_data->global_config->server_port;
+    cout<<"arr : "<<arr<<endl;
+    sscanf(arr, "%hu.%hu.%hu.%hu", &a, &b, &c, &d);
+    sscanf(port,"%hu",&p);
+    printf("%d %d %d %d : %d",a,b,c,d,p);
+    
+    int new_ip = (a << 24) | (b << 16) | (c << 8) | (d);
     memset(&ip_addr, 0, sizeof(ip_addr));
     ip_addr.sin_family = AF_INET;
-    ip_addr.sin_addr.s_addr = server_ip; /* Should be in network byte order */
-    ip_addr.sin_port = server_port;      //server_port;
+    ip_addr.sin_addr.s_addr = htonl(new_ip); /* Should be in network byte order */
+    ip_addr.sin_port = htons(p);      //server_port;
   
     //contp is a global netconnect handler  which will be used to connect with php server
     contp = TSContCreate(handlePHPConnectionEvents, TSMutexCreate());
     TSContDataSet(contp,this);
-    action = TSNetConnect(contp, (struct sockaddr const *)&ip_addr);
+    TSNetConnect(contp, (struct sockaddr const *)&ip_addr);
     cout<<"FastCGIIntercept::initServer : Data Set Contp:"<<contp<<endl;
     return contp;
 }

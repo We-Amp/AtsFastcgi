@@ -94,19 +94,16 @@ public:
   struct InterceptIO *server ;
   FastCGIIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
   {
-    // server.vc_ = server_vc;
-    // server.contp_ = contp;
     server = new InterceptIO();
-    
     server->txn_ = static_cast<TSHttpTxn>(transaction.getAtsHandle());
     cout <<"FastCGIIntercept : Added Server intercept" << endl;
   }
   void consume(const string &data, InterceptPlugin::RequestDataType type) override;
   void handleInputComplete() override;
   TSCont initServer();
-  void handleInputComplete1();
+  void writeResponseChunkToATS();
   
-  void setOutputComplete();
+  void setResponseOutputComplete();
   ~FastCGIIntercept() override
   {
     cout <<"~FastCGIIntercept : Shutting down server intercept" << endl;
