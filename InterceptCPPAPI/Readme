@@ -66,22 +66,22 @@ Example remap.config:
     map http://no-collapse2.www.example.com/ http://www.example.com/ @plugin=ats_mod_fcgi.so @pparam=conf/collapsed_connection/disable.config
 
 Its configuration file can have 5 configurable options:
-    CONFIG proxy.config.http.collapsed_connection.enabled INT 1
-    CONFIG proxy.config.http.collapsed_connection.required_header STRING NULL
-    CONFIG proxy.config.http.collapsed_connection.insert_lock_retry_time INT 10
-    CONFIG proxy.config.http.collapsed_connection.max_lock_retry_timeout INT 2000
-    CONFIG proxy.config.http.collapsed_connection.keep_pass_record_time INT 5000
+    CONFIG proxy.config.http.fcgi.enabled INT 1
+    CONFIG proxy.config.http.fcgi.host.hostname STRING localhost
+    CONFIG proxy.config.http.fcgi.host.server_ip  STRING 127.0.0.1
+    CONFIG proxy.config.http.fcgi.host.server_port STRING 60000
+    CONFIG proxy.config.http.fcgi.host.root_directory STRING /
 
 Meaning of these configurable options:
     enabled
         enable fcgi Server or not, useful in remap rules if we want to disable/enable specific remap rules.
-    required_header
-        only collapse requests with 'required_header' http header present.
-    insert_lock_retry_time
-        if hash entry was locked, retry to get lock after insert_lock_retry_time millisecond.
-    max_lock_retry_timeout
-        if request was unable to get lock more than max_lock_retry_timeout millisecond, it will be unblocked anyway.
-    keep_pass_record_time
-        if response is not public cacheable,
-        the pass sentinel will be kept in hash table for at least keep_pass_record_time millisecond before be removed.
+    hostname
+        hostname of the fcgi server in string format e.g localhost
+    server_ip
+        IP of the fcgi server machine in string format e.g 127.0.0.1
+    servre_port
+        fcgi server port number in string format e.g 60000
+    root_directory
+        root directory path from where fcgi server will server resources/web_contents
+        
 

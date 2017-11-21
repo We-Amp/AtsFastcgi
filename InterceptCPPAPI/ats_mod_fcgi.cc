@@ -72,11 +72,11 @@ void TSPluginInit(int argc ATSCPPAPI_UNUSED, const char *argv[] ATSCPPAPI_UNUSED
   // The fifth argument is to enable log rolling, this is enabled by default.
   // The sixth argument is the freuqency in which we will roll the logs, 300 seconds is very low,
   //  the default for this argument is 3600.
-  log.init(ATS_MOD_LOG_FILENAME, true, true, Logger::LOG_LEVEL_DEBUG, true, 300);
+  //log.init(ATS_MOD_LOG_FILENAME, true,true, Logger::LOG_LEVEL_DEBUG, true, 300);
 
   // Now that we've initialized a logger we can do all kinds of fun things on it:
-  log.setRollingEnabled(true);        // already done via log.init, just an example.
-  log.setRollingIntervalSeconds(300); // already done via log.init
+  //log.setRollingEnabled(true);        // already done via log.init, just an example.
+  //log.setRollingIntervalSeconds(300); // already done via log.init
 
   // You have two ways to log to a logger, you can log directly on the object itself:
   //log.logInfo("Hello World from: %s", argv[0]);
@@ -102,9 +102,9 @@ void TSPluginInit(int argc ATSCPPAPI_UNUSED, const char *argv[] ATSCPPAPI_UNUSED
 
   if (plugin_data->global_config->enabled) {
     plugin = new FastCGIGlobalPlugin();
-    LOG_DEBUG(log,"%s plugin loaded into ATS. Transaction_slot = %d",PLUGIN_NAME,plugin_data->txn_slot);
+    TSDebug(PLUGIN_NAME, " plugin loaded into ATS. Transaction_slot = %d",plugin_data->txn_slot);
   } else {
-    LOG_DEBUG(log,"%s plugin is disabled.",PLUGIN_NAME);
+    TSDebug(PLUGIN_NAME, " plugin is disabled.");
   }
 
 //  plugin = new FastCGIGlobalPlugin();

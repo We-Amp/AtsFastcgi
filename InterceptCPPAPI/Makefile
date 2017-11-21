@@ -4,14 +4,14 @@
 # 3. TRAFFIC_SERVER_SRC_DIR		--path to traffic server src directory 
 # 4. TRAFFIC_SERVER_EXEC_DIR    --path to traffic server exec directory
 
-TSXS?=/home/rahul/GDBTech/ATS/opt/ts-7.1/bin/tsxs
 MOD_FCGI_DIR=/home/rahul/GDBTech/newClone/AtsFastcgi/InterceptCPPAPI/
 TRAFFIC_SERVER_SRC_DIR=/home/rahul/GDBTech/ATS/trafficserver-7.1.1/
 TRAFFIC_SERVER_EXEC_DIR=/home/rahul/GDBTech/ATS/opt/ts-7.1/
 
-OBJ_FILES=fcgi_intercept.cc ats_fcgi_config.cc
+TSXS?=$(TRAFFIC_SERVER_EXEC_DIR)bin/tsxs
+OBJ_FILES=fcgi_intercept.cc ats_fcgi_config.cc ats_fcgi_client.cc
 
-TRAFFIC_SERVER_EXEC_CONF_DIR=/home/rahul/GDBTech/ATS/opt/ts-7.1/etc/trafficserver/
+TRAFFIC_SERVER_EXEC_CONF_DIR=$(TRAFFIC_SERVER_EXEC_DIR)etc/trafficserver/
 PLUGIN_CONF_FILES=$(MOD_FCGI_DIR)config/ats_mod_fcgi.config
 
 LDLIB_DIR=-L $(TRAFFIC_SERVER_EXEC_DIR)lib/

@@ -2,6 +2,7 @@
 #define ATS_FCGI_CONFIG_H
 
 #include <stdint.h>
+#include <string>
 #include <map>
 #include <list>
 #include <utility>
@@ -13,12 +14,13 @@
 #define DEFAULT_HOSTNAME "localhost"
 #define DEFAULT_SERVER_IP "127.0.0.1"
 #define DEFAULT_SERVER_PORT "60000"
-
+#define DEFAULT_INCLUDE_FILE "fastcgi.config"
 typedef enum {
   fcgiEnabled,
   fcgiHostname,
   fcgiServerIp,
   fcgiServerPort,
+  fcgiInclude
 } fcgiConfigKey;
 
 struct PassRecord {
@@ -29,13 +31,15 @@ struct PassRecord {
   typedef std::map<uint32_t, int8_t> UintMap;
   typedef std::list<PassRecord> UsecList;
   
+  typedef std::map<std::string,std::string> FCGIParams;
 
 typedef struct {
   bool enabled;
   TSMgmtString hostname;
   TSMgmtString server_ip;
   TSMgmtString server_port;
-
+  TSMgmtString include;
+  FCGIParams *param;
   //TSMgmtString root_directory;
   //int required_hostname_len;
 } fcgiPluginConfig;

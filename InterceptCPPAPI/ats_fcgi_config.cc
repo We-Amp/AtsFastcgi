@@ -53,7 +53,6 @@ fcgiHttpTxnConfigFind(const char *name, int length, fcgiConfigKey *conf, TSRecor
   if (length == -1) {
     length = strlen(name);
   }
-  LOG_INFO(log,"Config Param Name: %s , Length: %d",name,length);
   switch (length) {
   case 30:
     if (!strncmp(name, "proxy.config.http.fcgi.enabled", length)) {
@@ -76,6 +75,12 @@ fcgiHttpTxnConfigFind(const char *name, int length, fcgiConfigKey *conf, TSRecor
   case 39:
     if (!strncmp(name, "proxy.config.http.fcgi.host.server_port", length)) {
       *conf = fcgiServerPort;
+      *type = TS_RECORDDATATYPE_STRING;
+    }
+    break;
+  case 35:
+    if (!strncmp(name, "proxy.config.http.fcgi.host.include", length)) {
+      *conf = fcgiInclude;
       *type = TS_RECORDDATATYPE_STRING;
     }
     break;
@@ -104,6 +109,7 @@ fcgiPluginConfig *initConfig(const char *fn)
     config->hostname        = DEFAULT_HOSTNAME;
     config->server_ip = DEFAULT_SERVER_IP;
     config->server_port = DEFAULT_SERVER_PORT;
+    config->include = DEFAULT_INCLUDE_FILE;
   } else {
     // Inherit from global config
     fcgiPluginConfig *global_config = plugin_data->global_config;
@@ -111,6 +117,7 @@ fcgiPluginConfig *initConfig(const char *fn)
     config->hostname                = TSstrdup(global_config->hostname);
     config->server_ip               = TSstrdup(global_config->server_ip);
     config->server_port             = TSstrdup(global_config->server_port);
+    config->include                 = TSstrdup(global_config->include);
 
   }
 
@@ -121,8 +128,8 @@ fcgiPluginConfig *initConfig(const char *fn)
       } else if (0 == strcmp("1", fn)) {
         config->enabled = true;
       } else {
-        //TSError("[ats_mod_fcgi] Parameter '%s' ignored", fn);
-        LOG_ERROR(log,"Parameter '%s' ignored",fn);
+        TSError("[ats_mod_fcgi] Parameter '%s' ignored", fn);
+        
       }
     } else {
       int line_num = 0;
@@ -132,8 +139,7 @@ fcgiPluginConfig *initConfig(const char *fn)
       TSRecordDataType type, expected_type;
 
       if (nullptr == (file = TSfopen(fn, "r"))) {
-        //TSError("[ats_mod_fcgi] Could not open config file %s", fn);
-        LOG_ERROR(log,"Could not open config file %s",fn);
+        TSError("[ats_mod_fcgi] Could not open config file %s", fn);
       } else {
         while (nullptr != TSfgets(file, buf, sizeof(buf))) {
           char *ln, *tok;
@@ -151,28 +157,24 @@ fcgiPluginConfig *initConfig(const char *fn)
           }
 
           if (strncmp(tok, "CONFIG", 6)) {
-            //TSError("[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
-            LOG_ERROR(log,"File %s, line %d: non-CONFIG line encountered", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
             continue;
           }
           // Find the configuration name
           tok = strtok_r(nullptr, " \t", &ln);
           if (fcgiHttpTxnConfigFind(tok, -1, &name, &expected_type) != TS_SUCCESS) {
-            //TSError("[ats_mod_fcgi] File %s, line %d: no records.config name given", fn, line_num);
-            LOG_ERROR(log,"File %s, line %d: no records.config name given", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: no records.config name given", fn, line_num);
             continue;
           }
           // Find the type (INT or STRING only)
           tok = strtok_r(nullptr, " \t", &ln);
           if (TS_RECORDDATATYPE_NULL == (type = str_to_datatype(tok))) {
-            //TSError("[ats_mod_fcgi] File %s, line %d: only INT and STRING types supported", fn, line_num);
-            LOG_ERROR(log,"File %s, line %d: only INT and STRING types supported", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: only INT and STRING types supported", fn, line_num);
             continue;
           }
 
           if (type != expected_type) {
-            //TSError("[ats_mod_fcgi] File %s, line %d: mismatch between provide data type, and expected type", fn, line_num);
-            LOG_ERROR(log,"File %s, line %d: mismatch between provide data type, and expected type", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: mismatch between provide data type, and expected type", fn, line_num);
             continue;
           }
           // Find the value (which depends on the type above)
@@ -198,8 +200,7 @@ fcgiPluginConfig *initConfig(const char *fn)
             tok = nullptr;
           }
           if (!tok) {
-            //TSError("[ats_mod_fcgi] File %s, line %d: the configuration must provide a value", fn, line_num);
-            LOG_ERROR(log,"File %s, line %d: the configuration must provide a value", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: the configuration must provide a value", fn, line_num);
             continue;
           }
           // Now store the new config
@@ -238,6 +239,13 @@ fcgiPluginConfig *initConfig(const char *fn)
               config->server_port = TSstrdup(tok);
             }
             break;
+          case fcgiInclude:
+            if (4 == strlen(tok) && 0 == strcmp(tok, "NULL")) {
+              config->include = nullptr;
+            } else {
+              config->include = TSstrdup(tok);
+            }
+            break;  
           default:
             break;
           }
@@ -253,11 +261,10 @@ fcgiPluginConfig *initConfig(const char *fn)
   //   config->required_header_len = 0;
   // }
 
-  LOG_INFO(log,"%s enabled = %d",PLUGIN_NAME,static_cast<int>(config->enabled));
-  LOG_INFO(log,"%s hostname = %s",PLUGIN_NAME,config->hostname);
-  LOG_INFO(log,"%s server_ip = %s",PLUGIN_NAME,config->server_ip);
-  LOG_INFO(log,"%s server_port = %s",PLUGIN_NAME,config->server_port);
-
+  TSDebug(PLUGIN_NAME, "enabled = %d", static_cast<int>(config->enabled));
+  TSDebug(PLUGIN_NAME, "hostname = %s", config->hostname);
+  TSDebug(PLUGIN_NAME, "server_ip = %s", config->server_ip);
+  TSDebug(PLUGIN_NAME, "server_port = %s", config->server_port);
   return config;
 }
 

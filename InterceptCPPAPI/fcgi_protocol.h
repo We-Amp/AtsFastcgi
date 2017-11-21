@@ -63,9 +63,9 @@ typedef struct {
 } FCGI_BeginRequestBody;
 
 typedef struct {
-    FCGI_Header header;
-    FCGI_BeginRequestBody body;
-} FCGI_BeginRequestRecord;
+    FCGI_Header *header;
+    FCGI_BeginRequestBody *body;
+} FCGI_BeginRequest;
 
 /*
  * Mask for flags component of FCGI_BeginRequestBody
@@ -91,7 +91,7 @@ typedef struct {
 typedef struct {
     FCGI_Header header;
     FCGI_EndRequestBody body;
-} FCGI_EndRequestRecord;
+} FCGI_EndRequest;
 
 /*
  * Values for protocolStatus component of FCGI_EndRequestBody
@@ -116,7 +116,7 @@ typedef struct {
 typedef struct {
     FCGI_Header header;
     FCGI_UnknownTypeBody body;
-} FCGI_UnknownTypeRecord;
+} FCGI_UnknownTypeRequest;
 
 
 #endif /* FCGI_PROTOCOL_H */
