@@ -1,10 +1,10 @@
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <cctype>
 
-#include <ts/ts.h>
 #include "ats_fcgi_config.h"
+#include <ts/ts.h>
 
 #include "ats_mod_fcgi.h"
 using namespace fcgiGlobal;
@@ -17,9 +17,7 @@ using namespace fcgiGlobal;
  *
  * @return TSRecordDataType config data type
  */
-inline TSRecordDataType
-str_to_datatype(const char *str)
-{
+inline TSRecordDataType str_to_datatype(const char *str) {
   TSRecordDataType type = TS_RECORDDATATYPE_NULL;
 
   if (!str || !*str) {
@@ -46,9 +44,9 @@ str_to_datatype(const char *str)
  *
  * @return fcgiTxnState hashEntry added, should be ignore and pass, or fail
  */
-static TSReturnCode
-fcgiHttpTxnConfigFind(const char *name, int length, fcgiConfigKey *conf, TSRecordDataType *type)
-{
+static TSReturnCode fcgiHttpTxnConfigFind(const char *name, int length,
+                                          fcgiConfigKey *conf,
+                                          TSRecordDataType *type) {
   *type = TS_RECORDDATATYPE_NULL;
   if (length == -1) {
     length = strlen(name);
@@ -98,27 +96,26 @@ fcgiHttpTxnConfigFind(const char *name, int length, fcgiConfigKey *conf, TSRecor
  *
  * @return fcgiPluginConfig *config object
  */
-fcgiPluginConfig *initConfig(const char *fn)
-{
+fcgiPluginConfig *initConfig(const char *fn) {
   fcgiPluginData *plugin_data = getFCGIPlugin();
-  fcgiPluginConfig *config    = static_cast<fcgiPluginConfig *>(TSmalloc(sizeof(fcgiPluginConfig)));
+  fcgiPluginConfig *config =
+      static_cast<fcgiPluginConfig *>(TSmalloc(sizeof(fcgiPluginConfig)));
 
   // Default config
   if (nullptr == plugin_data || nullptr == plugin_data->global_config) {
-    config->enabled                = true;
-    config->hostname        = DEFAULT_HOSTNAME;
+    config->enabled = true;
+    config->hostname = DEFAULT_HOSTNAME;
     config->server_ip = DEFAULT_SERVER_IP;
     config->server_port = DEFAULT_SERVER_PORT;
     config->include = DEFAULT_INCLUDE_FILE;
   } else {
     // Inherit from global config
     fcgiPluginConfig *global_config = plugin_data->global_config;
-    config->enabled                 = global_config->enabled;
-    config->hostname                = TSstrdup(global_config->hostname);
-    config->server_ip               = TSstrdup(global_config->server_ip);
-    config->server_port             = TSstrdup(global_config->server_port);
-    config->include                 = TSstrdup(global_config->include);
-
+    config->enabled = global_config->enabled;
+    config->hostname = TSstrdup(global_config->hostname);
+    config->server_ip = TSstrdup(global_config->server_ip);
+    config->server_port = TSstrdup(global_config->server_port);
+    config->include = TSstrdup(global_config->include);
   }
 
   if (nullptr != fn) {
@@ -129,7 +126,6 @@ fcgiPluginConfig *initConfig(const char *fn)
         config->enabled = true;
       } else {
         TSError("[ats_mod_fcgi] Parameter '%s' ignored", fn);
-        
       }
     } else {
       int line_num = 0;
@@ -157,24 +153,33 @@ fcgiPluginConfig *initConfig(const char *fn)
           }
 
           if (strncmp(tok, "CONFIG", 6)) {
-            TSError("[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
+            TSError(
+                "[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered",
+                fn, line_num);
             continue;
           }
           // Find the configuration name
           tok = strtok_r(nullptr, " \t", &ln);
-          if (fcgiHttpTxnConfigFind(tok, -1, &name, &expected_type) != TS_SUCCESS) {
-            TSError("[ats_mod_fcgi] File %s, line %d: no records.config name given", fn, line_num);
+          if (fcgiHttpTxnConfigFind(tok, -1, &name, &expected_type) !=
+              TS_SUCCESS) {
+            TSError(
+                "[ats_mod_fcgi] File %s, line %d: no records.config name given",
+                fn, line_num);
             continue;
           }
           // Find the type (INT or STRING only)
           tok = strtok_r(nullptr, " \t", &ln);
           if (TS_RECORDDATATYPE_NULL == (type = str_to_datatype(tok))) {
-            TSError("[ats_mod_fcgi] File %s, line %d: only INT and STRING types supported", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: only INT and STRING "
+                    "types supported",
+                    fn, line_num);
             continue;
           }
 
           if (type != expected_type) {
-            TSError("[ats_mod_fcgi] File %s, line %d: mismatch between provide data type, and expected type", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: mismatch between provide "
+                    "data type, and expected type",
+                    fn, line_num);
             continue;
           }
           // Find the value (which depends on the type above)
@@ -200,13 +205,15 @@ fcgiPluginConfig *initConfig(const char *fn)
             tok = nullptr;
           }
           if (!tok) {
-            TSError("[ats_mod_fcgi] File %s, line %d: the configuration must provide a value", fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: the configuration must "
+                    "provide a value",
+                    fn, line_num);
             continue;
           }
           // Now store the new config
           switch (name) {
           case fcgiEnabled:
-            config->enabled = tok;//strtoll(tok, nullptr, 10);
+            config->enabled = tok; // strtoll(tok, nullptr, 10);
             break;
           case fcgiHostname:
             // if (nullptr != config->hostname) {
@@ -245,7 +252,7 @@ fcgiPluginConfig *initConfig(const char *fn)
             } else {
               config->include = TSstrdup(tok);
             }
-            break;  
+            break;
           default:
             break;
           }
@@ -268,43 +275,56 @@ fcgiPluginConfig *initConfig(const char *fn)
   return config;
 }
 
-fcgiPluginData *getFCGIPlugin(){
+fcgiPluginData *getFCGIPlugin() {
   static fcgiPluginData *data = nullptr;
-  
-    if (nullptr == data) {
-      TSMgmtInt read_while_writer = 0;
-      data                        = static_cast<fcgiPluginData *>(TSmalloc(sizeof(fcgiPluginData)));
-      data->mutex                 = TSMutexCreate();
-      data->active_hash_map       = new UintMap();
-      data->keep_pass_list        = new UsecList();
-      data->seq_id                = 0;
-      data->global_config         = nullptr;
-      TSHttpArgIndexReserve(PLUGIN_NAME, "reserve txn_data slot", &(data->txn_slot));
-      
-      // if (TS_SUCCESS == TSMgmtIntGet("proxy.config.cache.enable_read_while_writer", &read_while_writer) && read_while_writer > 0) {
-      //   data->read_while_writer = true;
-      // }
-  
-      // data->tol_global_hook_reqs =
-      //   TSStatCreate("collapsed_connection.total.global.reqs", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->tol_remap_hook_reqs =
-      //   TSStatCreate("collapsed_connection.total.remap.reqs", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->tol_collapsed_reqs =
-      //   TSStatCreate("collapsed_connection.total.collapsed.reqs", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->tol_non_cacheable_reqs =
-      //   TSStatCreate("collapsed_connection.total.noncacheable.reqs", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->tol_got_passed_reqs =
-      //   TSStatCreate("collapsed_connection.total.got_passed.reqs", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->cur_hash_entries =
-      //   TSStatCreate("collapsed_connection.current.hash.entries", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->cur_keep_pass_entries = TSStatCreate("collapsed_connection.current.keep_pass.entries", TS_RECORDDATATYPE_INT,
-      //                                            TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->max_hash_entries =
-      //   TSStatCreate("collapsed_connection.max.hash.entries", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      // data->max_keep_pass_entries =
-      //   TSStatCreate("collapsed_connection.max.keep_pass.entries", TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-    
-    }
-  
-    return data;
+
+  if (nullptr == data) {
+    TSMgmtInt read_while_writer = 0;
+    data = static_cast<fcgiPluginData *>(TSmalloc(sizeof(fcgiPluginData)));
+    data->mutex = TSMutexCreate();
+    data->active_hash_map = new UintMap();
+    data->keep_pass_list = new UsecList();
+    data->seq_id = 0;
+    data->global_config = nullptr;
+    TSHttpArgIndexReserve(PLUGIN_NAME, "reserve txn_data slot",
+                          &(data->txn_slot));
+
+    // if (TS_SUCCESS ==
+    // TSMgmtIntGet("proxy.config.cache.enable_read_while_writer",
+    // &read_while_writer) && read_while_writer > 0) {
+    //   data->read_while_writer = true;
+    // }
+
+    // data->tol_global_hook_reqs =
+    //   TSStatCreate("collapsed_connection.total.global.reqs",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+    // data->tol_remap_hook_reqs =
+    //   TSStatCreate("collapsed_connection.total.remap.reqs",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+    // data->tol_collapsed_reqs =
+    //   TSStatCreate("collapsed_connection.total.collapsed.reqs",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+    // data->tol_non_cacheable_reqs =
+    //   TSStatCreate("collapsed_connection.total.noncacheable.reqs",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+    // data->tol_got_passed_reqs =
+    //   TSStatCreate("collapsed_connection.total.got_passed.reqs",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+    // data->cur_hash_entries =
+    //   TSStatCreate("collapsed_connection.current.hash.entries",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+    // data->cur_keep_pass_entries =
+    // TSStatCreate("collapsed_connection.current.keep_pass.entries",
+    // TS_RECORDDATATYPE_INT,
+    //                                            TS_STAT_NON_PERSISTENT,
+    //                                            TS_STAT_SYNC_SUM);
+    // data->max_hash_entries =
+    //   TSStatCreate("collapsed_connection.max.hash.entries",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+    // data->max_keep_pass_entries =
+    //   TSStatCreate("collapsed_connection.max.keep_pass.entries",
+    //   TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+  }
+
+  return data;
 }
