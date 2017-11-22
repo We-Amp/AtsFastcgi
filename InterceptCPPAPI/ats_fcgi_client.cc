@@ -17,11 +17,17 @@ struct FCGIClient::FCGIClientState {
   std::map<string, string> requestHeaders;
   int request_id_;
   FCGIClientState()
-      : request_id_(0), request(nullptr), header(nullptr), postHeader(nullptr),
-        buff(nullptr), records(nullptr), pBuffInc(nullptr){
+    : request_id_(0),
+      request(nullptr),
+      header(nullptr),
+      postHeader(nullptr),
+      buff(nullptr),
+      records(nullptr),
+      pBuffInc(nullptr){
 
-                                         };
-  ~FCGIClientState() {
+      };
+  ~FCGIClientState()
+  {
     request_id_ = 0;
     free(request);
     free(header);
@@ -33,8 +39,9 @@ struct FCGIClient::FCGIClientState {
 
 // input to the constructor will be either unique transaction id or int type
 // requestId
-FCGIClientRequest::FCGIClientRequest(int request_id, int contentLength) {
-  state_ = new FCGIClientState();
+FCGIClientRequest::FCGIClientRequest(int request_id, int contentLength)
+{
+  state_              = new FCGIClientState();
   state_->request_id_ = request_id;
   // state_->requestHeaders = GenarateFcgiRequestHeaders();
   state_->buff = (unsigned char *)TSmalloc(BUF_SIZE);
@@ -44,23 +51,27 @@ FCGIClientRequest::FCGIClientRequest(int request_id, int contentLength) {
 
 // destructor will reset the client_req_id and delete the recListState_ object
 // holding respose records received from fcgi server
-FCGIClientRequest::~FCGIClientRequest() { delete state_; }
+FCGIClientRequest::~FCGIClientRequest()
+{
+  delete state_;
+}
 
-FCGI_Header *FCGIClientRequest::createHeader(uchar type) {
+FCGI_Header *
+FCGIClientRequest::createHeader(uchar type)
+{
   FCGI_Header *tmp = (FCGI_Header *)calloc(1, sizeof(FCGI_Header));
-  tmp->version = FCGI_VERSION_1;
-  tmp->type = type;
+  tmp->version     = FCGI_VERSION_1;
+  tmp->type        = type;
   fcgiHeaderSetRequestId(tmp, state_->request_id_);
   return tmp;
 }
 
-FCGI_BeginRequest *FCGIClientRequest::createBeginRequest(
-    std::map<std::string, std::string> fcgiReqHeaders) {
-
-  state_->request = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
-  state_->request->header = createHeader(FCGI_BEGIN_REQUEST);
-  state_->request->body =
-      (FCGI_BeginRequestBody *)calloc(1, sizeof(FCGI_BeginRequestBody));
+FCGI_BeginRequest *
+FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReqHeaders)
+{
+  state_->request               = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
+  state_->request->header       = createHeader(FCGI_BEGIN_REQUEST);
+  state_->request->body         = (FCGI_BeginRequestBody *)calloc(1, sizeof(FCGI_BeginRequestBody));
   state_->request->body->roleB0 = FCGI_RESPONDER;
 
   state_->request->header->contentLengthB0 = sizeof(FCGI_BeginRequestBody);
@@ -68,8 +79,7 @@ FCGI_BeginRequest *FCGIClientRequest::createBeginRequest(
   // serialize request header
   serialize(state_->pBuffInc, state_->request->header, sizeof(FCGI_Header));
   state_->pBuffInc += sizeof(FCGI_Header);
-  serialize(state_->pBuffInc, state_->request->body,
-            sizeof(FCGI_BeginRequestBody));
+  serialize(state_->pBuffInc, state_->request->body, sizeof(FCGI_BeginRequestBody));
   state_->pBuffInc += sizeof(FCGI_BeginRequestBody);
   TSDebug(PLUGIN_NAME, "Header Len: %d ", state_->pBuffInc - state_->buff);
   // FCGI Params headers
@@ -82,8 +92,8 @@ FCGI_BeginRequest *FCGIClientRequest::createBeginRequest(
   }
   state_->header->contentLengthB0 = BYTE_0(len);
   state_->header->contentLengthB1 = BYTE_1(len);
-  TSDebug(PLUGIN_NAME, "ParamsLen: %d ContLenB0: %d ContLenB1: %d", len,
-          state_->header->contentLengthB0, state_->header->contentLengthB1);
+  TSDebug(PLUGIN_NAME, "ParamsLen: %d ContLenB0: %d ContLenB1: %d", len, state_->header->contentLengthB0,
+          state_->header->contentLengthB1);
   serialize(state_->pBuffInc, state_->header, sizeof(FCGI_Header));
   state_->pBuffInc += sizeof(FCGI_Header);
 
@@ -100,9 +110,9 @@ FCGI_BeginRequest *FCGIClientRequest::createBeginRequest(
   string str("POST");
   if (str.compare(fcgiReqHeaders["REQUEST_METHOD"]) == 0) {
     TSDebug(PLUGIN_NAME, "serializing post data");
-    int dataLen = 0;
+    int dataLen        = 0;
     state_->postHeader = createHeader(FCGI_STDIN);
-    dataLen = postData.length();
+    dataLen            = postData.length();
 
     state_->postHeader->contentLengthB0 = BYTE_0(dataLen);
     state_->postHeader->contentLengthB1 = BYTE_1(dataLen);
@@ -116,16 +126,15 @@ FCGI_BeginRequest *FCGIClientRequest::createBeginRequest(
     state_->postHeader->contentLengthB1 = 0;
     serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
     state_->pBuffInc += sizeof(FCGI_Header);
-    TSDebug(PLUGIN_NAME, "Post Header Len: %d ",
-            state_->pBuffInc - state_->buff);
+    TSDebug(PLUGIN_NAME, "Post Header Len: %d ", state_->pBuffInc - state_->buff);
   }
 
   return state_->request;
 }
 
-unsigned char *FCGIClientRequest::addClientRequest(
-    string data, int &dataLen,
-    std::map<std::string, std::string> fcgiReqHeaders) {
+unsigned char *
+FCGIClientRequest::addClientRequest(string data, int &dataLen, std::map<std::string, std::string> fcgiReqHeaders)
+{
   dataLen = state_->pBuffInc - state_->buff;
   return state_->buff;
 
@@ -142,13 +151,15 @@ unsigned char *FCGIClientRequest::addClientRequest(
   // return state_->buff;
 }
 
-void FCGIClientRequest::serialize(uchar *buffer, void *st, size_t size) {
+void
+FCGIClientRequest::serialize(uchar *buffer, void *st, size_t size)
+{
   memcpy(buffer, st, size);
 }
 
 uint32_t
-FCGIClientRequest::serializeNameValue(uchar *buffer,
-                                      std::map<string, string>::iterator it) {
+FCGIClientRequest::serializeNameValue(uchar *buffer, std::map<string, string>::iterator it)
+{
   uchar *p = buffer;
   uint32_t nl, vl;
   nl = it->first.length();
@@ -178,7 +189,9 @@ FCGIClientRequest::serializeNameValue(uchar *buffer,
   return p - buffer;
 }
 
-uint32_t FCGIClientRequest::serializePostData(uchar *buffer, std::string str) {
+uint32_t
+FCGIClientRequest::serializePostData(uchar *buffer, std::string str)
+{
   uchar *p = buffer;
   uint32_t nl, vl;
   nl = str.length();
@@ -196,70 +209,80 @@ uint32_t FCGIClientRequest::serializePostData(uchar *buffer, std::string str) {
   // return 0;
 }
 
-void FCGIClientRequest::fcgiHeaderSetRequestId(FCGI_Header *h, int request_id) {
+void
+FCGIClientRequest::fcgiHeaderSetRequestId(FCGI_Header *h, int request_id)
+{
   h->requestIdB0 = BYTE_0(request_id);
   h->requestIdB1 = BYTE_1(request_id);
 }
 
-void FCGIClientRequest::fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len) {
+void
+FCGIClientRequest::fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len)
+{
   h->contentLengthB0 = BYTE_0(len);
   h->contentLengthB1 = BYTE_1(len);
 }
 
-uint32_t FCGIClientRequest::fcgiHeaderGetContentLen(FCGI_Header *h) {
+uint32_t
+FCGIClientRequest::fcgiHeaderGetContentLen(FCGI_Header *h)
+{
   printf("\ncontentLengthB1: %d ,contentLengthB0 : %d ,After shieft "
          "content_len_hi: %d",
          h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
   return (h->contentLengthB1 << 8) + h->contentLengthB0;
 }
 
-FCGIRecordList *FCGIClientRequest::fcgiRecordCreate() {
+FCGIRecordList *
+FCGIClientRequest::fcgiRecordCreate()
+{
   FCGIRecordList *tmp = (FCGIRecordList *)TSmalloc(sizeof(FCGIRecordList));
-  tmp->header = (FCGI_Header *)calloc(sizeof(FCGI_Header), 1);
-  tmp->next = nullptr;
-  tmp->state = (FCGI_State)0;
-  tmp->length = 0;
-  tmp->offset = 0;
+  tmp->header         = (FCGI_Header *)calloc(sizeof(FCGI_Header), 1);
+  tmp->next           = nullptr;
+  tmp->state          = (FCGI_State)0;
+  tmp->length         = 0;
+  tmp->offset         = 0;
   return tmp;
 }
 
-int FCGIClientRequest::fcgiProcessHeader(uchar ch, FCGIRecordList *rec) {
+int
+FCGIClientRequest::fcgiProcessHeader(uchar ch, FCGIRecordList *rec)
+{
   FCGI_Header *h;
   FCGI_State *state = &(rec->state);
-  h = rec->header;
+  h                 = rec->header;
 
   switch (*state) {
   case fcgi_state_version:
     h->version = ch;
-    *state = fcgi_state_type;
+    *state     = fcgi_state_type;
     break;
   case fcgi_state_type:
     h->type = ch;
-    *state = fcgi_state_request_id_hi;
+    *state  = fcgi_state_request_id_hi;
     break;
   case fcgi_state_request_id_hi:
     h->requestIdB1 = ch;
-    *state = fcgi_state_request_id_lo;
+    *state         = fcgi_state_request_id_lo;
     break;
   case fcgi_state_request_id_lo:
     h->requestIdB0 = ch;
-    *state = fcgi_state_content_len_hi;
+    *state         = fcgi_state_content_len_hi;
     break;
   case fcgi_state_content_len_hi:
     h->contentLengthB1 = ch;
-    *state = fcgi_state_content_len_lo;
+    *state             = fcgi_state_content_len_lo;
     break;
   case fcgi_state_content_len_lo:
     h->contentLengthB0 = ch;
-    *state = fcgi_state_padding_len;
+    *state             = fcgi_state_padding_len;
     break;
   case fcgi_state_padding_len:
     h->paddingLength = ch;
-    *state = fcgi_state_reserved;
+    *state           = fcgi_state_reserved;
     break;
   case fcgi_state_reserved:
     h->reserved = ch;
-    *state = fcgi_state_content_begin;
+    *state      = fcgi_state_content_begin;
     break;
 
   case fcgi_state_content_begin:
@@ -271,18 +294,17 @@ int FCGIClientRequest::fcgiProcessHeader(uchar ch, FCGIRecordList *rec) {
   return FCGI_PROCESS_AGAIN;
 }
 
-int FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf,
-                                          FCGIRecordList *rec) {
-
+int
+FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec)
+{
   size_t tot_len, con_len, cpy_len, offset, nb = end_buf - *beg_buf;
   FCGI_State *state = &(rec->state);
-  FCGI_Header *h = rec->header;
-  offset = rec->offset;
+  FCGI_Header *h    = rec->header;
+  offset            = rec->offset;
 
   if (*state == fcgi_state_padding) {
     *state = fcgi_state_done;
-    *beg_buf +=
-        (size_t)((int)rec->length - (int)offset + (int)h->paddingLength);
+    *beg_buf += (size_t)((int)rec->length - (int)offset + (int)h->paddingLength);
     return FCGI_PROCESS_DONE;
   }
 
@@ -292,7 +314,6 @@ int FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf,
   if (con_len <= nb)
     cpy_len = con_len;
   else {
-
     cpy_len = nb;
   }
   memcpy(rec->content + offset, *beg_buf, cpy_len);
@@ -315,9 +336,9 @@ int FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf,
   return 0;
 }
 
-int FCGIClientRequest::fcgiProcessRecord(uchar **beg_buf, uchar *end_buf,
-                                         FCGIRecordList *rec) {
-
+int
+FCGIClientRequest::fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec)
+{
   int rv;
   while (rec->state < fcgi_state_content_begin) {
     if ((rv = fcgiProcessHeader(**beg_buf, rec)) == FCGI_PROCESS_ERR)
@@ -327,28 +348,27 @@ int FCGIClientRequest::fcgiProcessRecord(uchar **beg_buf, uchar *end_buf,
       return FCGI_PROCESS_AGAIN;
   }
   if (rec->state == fcgi_state_content_begin) {
-    rec->length = fcgiHeaderGetContentLen(rec->header);
+    rec->length  = fcgiHeaderGetContentLen(rec->header);
     rec->content = TSmalloc(rec->length);
-    rec->state = (FCGI_State)(int(rec->state) + 1);
+    rec->state   = (FCGI_State)(int(rec->state) + 1);
   }
 
   return fcgiProcessContent(beg_buf, end_buf, rec);
 }
 
-void FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf,
-                                          FCGIRecordList **head) {
-
+void
+FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, FCGIRecordList **head)
+{
   FCGIRecordList *tmp, *h;
   if (*head == nullptr)
     *head = fcgiRecordCreate();
-  h = *head;
+  h       = *head;
 
   while (1) {
-
     if (h->state == fcgi_state_done) {
-      tmp = h;
-      *head = fcgiRecordCreate();
-      h = *head;
+      tmp     = h;
+      *head   = fcgiRecordCreate();
+      h       = *head;
       h->next = tmp;
     }
 
@@ -363,13 +383,15 @@ void FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf,
   }
 }
 
-void FCGIClientRequest::fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain) {
-  fcgiProcessBuffer((uchar *)beg_buf, (uchar *)beg_buf + (size_t)remain,
-                    &state_->records);
+void
+FCGIClientRequest::fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain)
+{
+  fcgiProcessBuffer((uchar *)beg_buf, (uchar *)beg_buf + (size_t)remain, &state_->records);
 }
 
-string FCGIClientRequest::writeToServerObj() {
-
+string
+FCGIClientRequest::writeToServerObj()
+{
   FCGIRecordList *rec;
   std::map<int, string> res;
   string serverResponse;
@@ -390,7 +412,9 @@ string FCGIClientRequest::writeToServerObj() {
   return serverResponse;
 }
 
-void FCGIClientRequest::print_bytes(uchar *buf, int n) {
+void
+FCGIClientRequest::print_bytes(uchar *buf, int n)
+{
   int i;
   printf("{");
   for (i = 0; i < n; i++)

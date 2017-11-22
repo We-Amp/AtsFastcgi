@@ -17,7 +17,9 @@ using namespace fcgiGlobal;
  *
  * @return TSRecordDataType config data type
  */
-inline TSRecordDataType str_to_datatype(const char *str) {
+inline TSRecordDataType
+str_to_datatype(const char *str)
+{
   TSRecordDataType type = TS_RECORDDATATYPE_NULL;
 
   if (!str || !*str) {
@@ -44,9 +46,9 @@ inline TSRecordDataType str_to_datatype(const char *str) {
  *
  * @return fcgiTxnState hashEntry added, should be ignore and pass, or fail
  */
-static TSReturnCode fcgiHttpTxnConfigFind(const char *name, int length,
-                                          fcgiConfigKey *conf,
-                                          TSRecordDataType *type) {
+static TSReturnCode
+fcgiHttpTxnConfigFind(const char *name, int length, fcgiConfigKey *conf, TSRecordDataType *type)
+{
   *type = TS_RECORDDATATYPE_NULL;
   if (length == -1) {
     length = strlen(name);
@@ -96,26 +98,27 @@ static TSReturnCode fcgiHttpTxnConfigFind(const char *name, int length,
  *
  * @return fcgiPluginConfig *config object
  */
-fcgiPluginConfig *initConfig(const char *fn) {
+fcgiPluginConfig *
+initConfig(const char *fn)
+{
   fcgiPluginData *plugin_data = getFCGIPlugin();
-  fcgiPluginConfig *config =
-      static_cast<fcgiPluginConfig *>(TSmalloc(sizeof(fcgiPluginConfig)));
+  fcgiPluginConfig *config    = static_cast<fcgiPluginConfig *>(TSmalloc(sizeof(fcgiPluginConfig)));
 
   // Default config
   if (nullptr == plugin_data || nullptr == plugin_data->global_config) {
-    config->enabled = true;
-    config->hostname = DEFAULT_HOSTNAME;
-    config->server_ip = DEFAULT_SERVER_IP;
+    config->enabled     = true;
+    config->hostname    = DEFAULT_HOSTNAME;
+    config->server_ip   = DEFAULT_SERVER_IP;
     config->server_port = DEFAULT_SERVER_PORT;
-    config->include = DEFAULT_INCLUDE_FILE;
+    config->include     = DEFAULT_INCLUDE_FILE;
   } else {
     // Inherit from global config
     fcgiPluginConfig *global_config = plugin_data->global_config;
-    config->enabled = global_config->enabled;
-    config->hostname = TSstrdup(global_config->hostname);
-    config->server_ip = TSstrdup(global_config->server_ip);
-    config->server_port = TSstrdup(global_config->server_port);
-    config->include = TSstrdup(global_config->include);
+    config->enabled                 = global_config->enabled;
+    config->hostname                = TSstrdup(global_config->hostname);
+    config->server_ip               = TSstrdup(global_config->server_ip);
+    config->server_port             = TSstrdup(global_config->server_port);
+    config->include                 = TSstrdup(global_config->include);
   }
 
   if (nullptr != fn) {
@@ -153,18 +156,13 @@ fcgiPluginConfig *initConfig(const char *fn) {
           }
 
           if (strncmp(tok, "CONFIG", 6)) {
-            TSError(
-                "[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered",
-                fn, line_num);
+            TSError("[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
             continue;
           }
           // Find the configuration name
           tok = strtok_r(nullptr, " \t", &ln);
-          if (fcgiHttpTxnConfigFind(tok, -1, &name, &expected_type) !=
-              TS_SUCCESS) {
-            TSError(
-                "[ats_mod_fcgi] File %s, line %d: no records.config name given",
-                fn, line_num);
+          if (fcgiHttpTxnConfigFind(tok, -1, &name, &expected_type) != TS_SUCCESS) {
+            TSError("[ats_mod_fcgi] File %s, line %d: no records.config name given", fn, line_num);
             continue;
           }
           // Find the type (INT or STRING only)
@@ -275,19 +273,20 @@ fcgiPluginConfig *initConfig(const char *fn) {
   return config;
 }
 
-fcgiPluginData *getFCGIPlugin() {
+fcgiPluginData *
+getFCGIPlugin()
+{
   static fcgiPluginData *data = nullptr;
 
   if (nullptr == data) {
     TSMgmtInt read_while_writer = 0;
-    data = static_cast<fcgiPluginData *>(TSmalloc(sizeof(fcgiPluginData)));
-    data->mutex = TSMutexCreate();
-    data->active_hash_map = new UintMap();
-    data->keep_pass_list = new UsecList();
-    data->seq_id = 0;
-    data->global_config = nullptr;
-    TSHttpArgIndexReserve(PLUGIN_NAME, "reserve txn_data slot",
-                          &(data->txn_slot));
+    data                        = static_cast<fcgiPluginData *>(TSmalloc(sizeof(fcgiPluginData)));
+    data->mutex                 = TSMutexCreate();
+    data->active_hash_map       = new UintMap();
+    data->keep_pass_list        = new UsecList();
+    data->seq_id                = 0;
+    data->global_config         = nullptr;
+    TSHttpArgIndexReserve(PLUGIN_NAME, "reserve txn_data slot", &(data->txn_slot));
 
     // if (TS_SUCCESS ==
     // TSMgmtIntGet("proxy.config.cache.enable_read_while_writer",

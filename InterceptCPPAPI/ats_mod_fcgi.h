@@ -14,7 +14,8 @@
 #include <atscppapi/Logger.h>
 
 using namespace atscppapi;
-namespace fcgiGlobal {
+namespace fcgiGlobal
+{
 extern Logger log;
 extern GlobalPlugin *plugin;
 extern fcgiPluginData *plugin_data;

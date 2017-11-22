@@ -26,31 +26,32 @@ using std::string;
  * and will provide detailed information about the logging site such as
  * filename, function name, and line number of the message
  */
-namespace fcgiGlobal {
+namespace fcgiGlobal
+{
 Logger log;
 GlobalPlugin *plugin;
 fcgiPluginData *plugin_data;
 }
 using namespace fcgiGlobal;
 
-class FastCGIGlobalPlugin : public GlobalPlugin {
+class FastCGIGlobalPlugin : public GlobalPlugin
+{
 public:
-  FastCGIGlobalPlugin() : GlobalPlugin(true) {
-    GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS);
-  }
-  void handleReadRequestHeaders(Transaction &transaction) override {
-    if (transaction.getClientRequest().getUrl().getPath().find(".php") !=
-        string::npos) {
+  FastCGIGlobalPlugin() : GlobalPlugin(true) { GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS); }
+  void
+  handleReadRequestHeaders(Transaction &transaction) override
+  {
+    if (transaction.getClientRequest().getUrl().getPath().find(".php") != string::npos) {
       transaction.addPlugin(new FastCGIIntercept(transaction));
     }
     transaction.resume();
   }
 };
 
-void TSPluginInit(int argc ATSCPPAPI_UNUSED,
-                  const char *argv[] ATSCPPAPI_UNUSED) {
-  RegisterGlobalPlugin(ATS_MODULE_FCGI_NAME, "apache",
-                       "dev@trafficserver.apache.org");
+void
+TSPluginInit(int argc ATSCPPAPI_UNUSED, const char *argv[] ATSCPPAPI_UNUSED)
+{
+  RegisterGlobalPlugin(ATS_MODULE_FCGI_NAME, "apache", "dev@trafficserver.apache.org");
   // cout << "Registered and invoked the ats_mod_fcgi Plugin into ATS." << endl;
 
   // Create a new logger
@@ -107,8 +108,7 @@ void TSPluginInit(int argc ATSCPPAPI_UNUSED,
 
   if (plugin_data->global_config->enabled) {
     plugin = new FastCGIGlobalPlugin();
-    TSDebug(PLUGIN_NAME, " plugin loaded into ATS. Transaction_slot = %d",
-            plugin_data->txn_slot);
+    TSDebug(PLUGIN_NAME, " plugin loaded into ATS. Transaction_slot = %d", plugin_data->txn_slot);
   } else {
     TSDebug(PLUGIN_NAME, " plugin is disabled.");
   }

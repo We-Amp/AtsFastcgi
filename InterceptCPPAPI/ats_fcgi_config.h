@@ -16,13 +16,7 @@
 #define DEFAULT_SERVER_IP "127.0.0.1"
 #define DEFAULT_SERVER_PORT "60000"
 #define DEFAULT_INCLUDE_FILE "fastcgi.config"
-typedef enum {
-  fcgiEnabled,
-  fcgiHostname,
-  fcgiServerIp,
-  fcgiServerPort,
-  fcgiInclude
-} fcgiConfigKey;
+typedef enum { fcgiEnabled, fcgiHostname, fcgiServerIp, fcgiServerPort, fcgiInclude } fcgiConfigKey;
 
 struct PassRecord {
   int64_t timeout;

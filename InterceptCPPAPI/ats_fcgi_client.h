@@ -25,7 +25,8 @@ typedef unsigned char uchar;
 #define FCGI_PROCESS_DONE 2
 #define FCGI_PROCESS_ERR 3
 
-namespace FCGIClient {
+namespace FCGIClient
+{
 using namespace atscppapi;
 
 typedef enum {
@@ -54,14 +55,16 @@ struct FCGIRecordList {
   FCGIRecordList(){
 
   };
-  ~FCGIRecordList() {
+  ~FCGIRecordList()
+  {
     TSfree(header);
     TSfree(content);
     TSfree(next);
   }
 };
 
-class FCGIClientRequest {
+class FCGIClientRequest
+{
 public:
   std::string postData;
   FCGIClientRequest(int request_id, int contentLength);
@@ -76,12 +79,9 @@ public:
   void fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len);
   uint32_t fcgiHeaderGetContentLen(FCGI_Header *h);
 
-  uint32_t serializeNameValue(uchar *buffer,
-                              std::map<std::string, std::string>::iterator it);
+  uint32_t serializeNameValue(uchar *buffer, std::map<std::string, std::string>::iterator it);
   uint32_t serializePostData(uchar *buffer, std::string str);
-  unsigned char *
-  addClientRequest(std::string data, int &,
-                   std::map<std::string, std::string> fcgiReqHeaders);
+  unsigned char *addClientRequest(std::string data, int &, std::map<std::string, std::string> fcgiReqHeaders);
   // Response Decoding member functions
   void fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, FCGIRecordList **head);
   FCGIRecordList *fcgiRecordCreate();
