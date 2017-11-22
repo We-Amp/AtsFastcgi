@@ -1,8 +1,7 @@
 #Please update below required files/directories inorder to work this make file
-# 1. TSXS  						--path to tsxs script file present under path/to/ts/bin/tsxs
-# 2. MOD_FCGI_DIR   			--specify the directory where ats_mod_fcgi plugin src is present.
-# 3. TRAFFIC_SERVER_SRC_DIR		--path to traffic server src directory
-# 4. TRAFFIC_SERVER_EXEC_DIR    --path to traffic server exec directory
+# 1. ATS_SRC		--either set or export env variable path to traffic server src directory
+# 2. ATS_EXEC       --either set or export env variable path to traffic server exec directory
+
 
 ifndef ATS_SRC
 $(error ATS_SRC is not set)

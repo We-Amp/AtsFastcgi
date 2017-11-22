@@ -47,7 +47,7 @@ FastCGIIntercept::setResponseOutputComplete()
 }
 
 int64_t
-InterceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
+interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
 {
   TSIOBufferBlock block;
   int64_t consumed       = 0;
@@ -83,15 +83,12 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     server->vc_    = (TSVConn)edata;
     server->contp_ = contp;
     // create a php request according to client requested appropriate headers
-    // conversion
     string clientData;
     unsigned char *clientReq;
-    int reqLen = 0;
-    std::map<string, string> requestHeaders = server->GetFcgiRequestHeaders();
+    int reqLen            = 0;
     fcgiRequest->postData = server->clientRequestBody;
-    server->printFCGIRequestHeaders(requestHeaders);
-    fcgiRequest->createBeginRequest(requestHeaders);
-    clientReq = fcgiRequest->addClientRequest(server->clientData, reqLen, requestHeaders);
+    fcgiRequest->createBeginRequest();
+    clientReq = fcgiRequest->addClientRequest(server->clientData, reqLen);
     // To Print FCGIRequest Headers
     // fcgiRequest->print_bytes(clientReq,reqLen);
     server->writeio.phpWrite(server->vc_, contp, clientReq, reqLen);
@@ -106,7 +103,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   }
   case TS_EVENT_VCONN_READ_READY: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Inside Read Ready...VConn Open ");
-    InterceptTransferData(server, fcgiRequest);
+    interceptTransferData(server, fcgiRequest);
     break;
   }
 
@@ -122,7 +119,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Sending Response to client side");
-    InterceptTransferData(server, fcgiRequest);
+    interceptTransferData(server, fcgiRequest);
     server->serverResponse = fcgiRequest->writeToServerObj();
 
     fcgi->writeResponseChunkToATS();
@@ -169,54 +166,6 @@ FastCGIIntercept::initServer()
   TSNetConnect(contp, (struct sockaddr const *)&ip_addr);
   TSDebug(PLUGIN_NAME, "FastCGIIntercept::initServer : Data Set Contp: %p", contp);
   return contp;
-}
-
-std::map<std::string, std::string>
-InterceptIO::GetFcgiRequestHeaders()
-{
-  using namespace std;
-
-  map<string, string> m;
-
-  Transaction &transaction = utils::internal::getTransaction(txn_);
-  // Retriving headers inside local Headers to build  request as per config
-  // later
-  // Headers &h = transaction.getClientRequest().getHeaders();
-  // if(h.isInitialized()){
-  //   cout<<"Header Count: "<<h.size()<<endl;
-  // }
-
-  m["SCRIPT_FILENAME"]   = "/var/www/html/" + transaction.getClientRequest().getUrl().getPath();
-  m["GATEWAY_INTERFACE"] = "FastCGI/1.1";
-  m["REQUEST_METHOD"]    = HTTP_METHOD_STRINGS[transaction.getClientRequest().getMethod()];
-  m["SCRIPT_NAME"]       = transaction.getClientRequest().getUrl().getPath();
-  m["QUERY_STRING"]      = transaction.getClientRequest().getUrl().getQuery();
-  m["REQUEST_URI"]       = transaction.getClientRequest().getUrl().getPath();
-  m["DOCUMET_ROOT"]      = "/";
-  m["SERVER_SOFTWARE"]   = "ATS 7.1.1";
-  m["REMOTE_ADDR"]       = "127.0.0.1";
-  m["REMOTE_PORT"]       = "";
-  m["SERVER_ADDR"]       = "127.0.0.1";
-  m["SERVER_PORT"]       = "60000";
-  m["SERVER_NAME"]       = "SimpleServer";
-  m["SERVER_PROTOCOL"]   = "HTTP/1.1";
-  m["CONTENT_TYPE"]      = "application/x-www-form-urlencoded";
-
-  std::ostringstream stream;
-  stream << clientRequestBody.length();
-  std::string x_str   = stream.str();
-  m["CONTENT_LENGTH"] = x_str;
-  // m["FCGI_ROLE"] =  "RESPONDER";
-  return m;
-}
-
-void
-InterceptIO::printFCGIRequestHeaders(std::map<std::string, std::string> m)
-{
-  std::map<string, string>::iterator it;
-  for (it = m.begin(); it != m.end(); ++it) {
-    cout << it->first << " => " << it->second << endl;
-  }
 }
 
 void

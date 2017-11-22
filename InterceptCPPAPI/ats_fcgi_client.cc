@@ -3,8 +3,16 @@
 #include "fcgi_protocol.h"
 #include "ts/ink_defs.h"
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <ts/ts.h>
+#include <map>
+#include <iterator>
+#include "utils_internal.h"
+#include <atscppapi/Headers.h>
+#include <atscppapi/utils.h>
+
+using namespace atscppapi;
 using namespace FCGIClient;
 using namespace std;
 
@@ -13,7 +21,8 @@ struct FCGIClient::FCGIClientState {
   FCGI_Header *header, *postHeader;
   unsigned char *buff, *pBuffInc;
   FCGIRecordList *records = nullptr;
-  std::map<string, string> requestHeaders;
+  TSHttpTxn txn_;
+  map<string, string> requestHeaders;
   int request_id_;
 
   FCGIClientState()
@@ -32,12 +41,39 @@ struct FCGIClient::FCGIClientState {
 
 // input to the constructor will be either unique transaction id or int type
 // requestId
-FCGIClientRequest::FCGIClientRequest(int request_id, int contentLength)
+FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
 {
-  state_              = new FCGIClientState();
-  state_->request_id_ = request_id;
-  // state_->requestHeaders = GenarateFcgiRequestHeaders();
-  state_->buff = (unsigned char *)TSmalloc(BUF_SIZE);
+  state_                 = new FCGIClientState();
+  state_->txn_           = txn;
+  state_->request_id_    = request_id;
+  state_->requestHeaders = GenerateFcgiRequestHeaders();
+  // TODO Call printFCGIRequestHeaders() to printFCGIHeaders
+  string str("POST"), value;
+  if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
+    Transaction &transaction = utils::internal::getTransaction(state_->txn_);
+    Headers &h               = transaction.getClientRequest().getHeaders();
+
+    if (h.isInitialized()) {
+      cout << "Header Count: " << h.size() << endl;
+      string key("Content-Length");
+      atscppapi::header_field_iterator it = h.find(key);
+      atscppapi::HeaderField hf(*it);
+      value = hf.values(value);
+      cout << "Content Length Value: " << value << endl;
+      state_->requestHeaders["CONTENT_LENGTH"] = value.c_str();
+      // TODO atscppapi::header_field_value_iterator hfv = hf.begin();
+    }
+
+    int contentLength = 0;
+    string cl         = state_->requestHeaders["CONTENT_LENGTH"];
+    stringstream strToInt(cl);
+    strToInt >> contentLength;
+    cout << "Content Length to Int" << contentLength << endl;
+
+    state_->buff = (unsigned char *)TSmalloc(BUF_SIZE + contentLength);
+  } else {
+    state_->buff = (unsigned char *)TSmalloc(BUF_SIZE);
+  }
 
   state_->pBuffInc = state_->buff;
 }
@@ -47,6 +83,43 @@ FCGIClientRequest::FCGIClientRequest(int request_id, int contentLength)
 FCGIClientRequest::~FCGIClientRequest()
 {
   delete state_;
+}
+
+map<string, string>
+FCGIClientRequest::GenerateFcgiRequestHeaders()
+{
+  map<string, string> fcgiReqHeader;
+  Transaction &transaction = utils::internal::getTransaction(state_->txn_);
+  // Retriving headers inside local Headers to build  request as per config
+  // later
+
+  fcgiReqHeader["SCRIPT_FILENAME"]   = "/var/www/html/" + transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["GATEWAY_INTERFACE"] = "FastCGI/1.1";
+  fcgiReqHeader["REQUEST_METHOD"]    = HTTP_METHOD_STRINGS[transaction.getClientRequest().getMethod()];
+
+  fcgiReqHeader["SCRIPT_NAME"]     = transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["QUERY_STRING"]    = transaction.getClientRequest().getUrl().getQuery();
+  fcgiReqHeader["REQUEST_URI"]     = transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["DOCUMET_ROOT"]    = "/";
+  fcgiReqHeader["SERVER_SOFTWARE"] = "ATS 7.1.1";
+  fcgiReqHeader["REMOTE_ADDR"]     = "127.0.0.1";
+  fcgiReqHeader["REMOTE_PORT"]     = "";
+  fcgiReqHeader["SERVER_ADDR"]     = "127.0.0.1";
+  fcgiReqHeader["SERVER_PORT"]     = "60000";
+  fcgiReqHeader["SERVER_NAME"]     = "SimpleServer";
+  fcgiReqHeader["SERVER_PROTOCOL"] = "HTTP/1.1";
+  fcgiReqHeader["CONTENT_TYPE"]    = "application/x-www-form-urlencoded";
+  fcgiReqHeader["FCGI_ROLE"]       = "RESPONDER";
+  return fcgiReqHeader;
+}
+
+void
+FCGIClientRequest::printFCGIRequestHeaders()
+{
+  std::map<string, string>::iterator it;
+  for (it = state_->requestHeaders.begin(); it != state_->requestHeaders.end(); ++it) {
+    cout << it->first << " => " << it->second << endl;
+  }
 }
 
 FCGI_Header *
@@ -60,7 +133,7 @@ FCGIClientRequest::createHeader(uchar type)
 }
 
 FCGI_BeginRequest *
-FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReqHeaders)
+FCGIClientRequest::createBeginRequest()
 {
   state_->request               = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
   state_->request->header       = createHeader(FCGI_BEGIN_REQUEST);
@@ -79,7 +152,7 @@ FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReq
   state_->header = createHeader(FCGI_PARAMS);
   int len = 0, nb = 0;
   std::map<string, string>::iterator it;
-  for (it = fcgiReqHeaders.begin(); it != fcgiReqHeaders.end(); ++it) {
+  for (it = state_->requestHeaders.begin(); it != state_->requestHeaders.end(); ++it) {
     nb = serializeNameValue(state_->pBuffInc, it);
     len += nb;
   }
@@ -90,7 +163,7 @@ FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReq
   serialize(state_->pBuffInc, state_->header, sizeof(FCGI_Header));
   state_->pBuffInc += sizeof(FCGI_Header);
 
-  for (it = fcgiReqHeaders.begin(); it != fcgiReqHeaders.end(); ++it) {
+  for (it = state_->requestHeaders.begin(); it != state_->requestHeaders.end(); ++it) {
     nb = serializeNameValue(state_->pBuffInc, it);
     state_->pBuffInc += nb;
   }
@@ -101,7 +174,7 @@ FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReq
   state_->pBuffInc += sizeof(FCGI_Header);
 
   string str("POST");
-  if (str.compare(fcgiReqHeaders["REQUEST_METHOD"]) == 0) {
+  if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
     TSDebug(PLUGIN_NAME, "serializing post data");
     int dataLen        = 0;
     state_->postHeader = createHeader(FCGI_STDIN);
@@ -126,7 +199,7 @@ FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReq
 }
 
 unsigned char *
-FCGIClientRequest::addClientRequest(string data, int &dataLen, std::map<std::string, std::string> fcgiReqHeaders)
+FCGIClientRequest::addClientRequest(string data, int &dataLen)
 {
   dataLen = state_->pBuffInc - state_->buff;
   return state_->buff;

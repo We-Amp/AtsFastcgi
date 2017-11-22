@@ -67,12 +67,15 @@ class FCGIClientRequest
 {
 public:
   std::string postData;
-  FCGIClientRequest(int request_id, int contentLength);
+  FCGIClientRequest(int request_id, TSHttpTxn txn);
   ~FCGIClientRequest();
+
+  std::map<std::string, std::string> GenerateFcgiRequestHeaders();
+  void printFCGIRequestHeaders();
 
   // Request Creation
   FCGI_Header *createHeader(unsigned char type);
-  FCGI_BeginRequest *createBeginRequest(std::map<std::string, std::string>);
+  FCGI_BeginRequest *createBeginRequest();
 
   void serialize(uchar *buffer, void *st, size_t size);
   void fcgiHeaderSetRequestId(FCGI_Header *h, int request_id);
@@ -81,7 +84,7 @@ public:
 
   uint32_t serializeNameValue(uchar *buffer, std::map<std::string, std::string>::iterator it);
   uint32_t serializePostData(uchar *buffer, std::string str);
-  unsigned char *addClientRequest(std::string data, int &, std::map<std::string, std::string> fcgiReqHeaders);
+  unsigned char *addClientRequest(std::string data, int &);
 
   // Response Decoding member functions
   void fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, FCGIRecordList **head);

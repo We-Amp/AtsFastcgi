@@ -1,4 +1,23 @@
 -----------------------------------------------------------------------------
+Coding convention and formatting in VS Code:
+   Using below config and store it in settings.json :
+    {
+    "C_Cpp.clang_format_path": "oathto/trafficserver-7.1.1/.git/fmt/20160415/clang-format/clang-format.linux",
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "C_Cpp.intelliSenseEngine": "Default"
+    }
+
+Download the ATS clang-format binary ,find the url from path/to/trafficserver/tools/git/pre-commit
+Extract the file and set the flag  "C_Cpp.clang_format_path" to file path.
+
+2. Adding pre-commit hook :
+   Copy the file path/to/trafficserver/tools/git/pre-commit under .git/hook/ directory.
+   This will does the formatting every time does a commit.
+   
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
 Build and Install cmd = 
 
 #building CPP ats_mod_fcgi.so
@@ -11,12 +30,10 @@ Build and Install cmd =
 
 OR Build and install using Makefile utility:
   Before doing make Plz set below directories.
-  # 1. TSXS  						--path to tsxs script file present under path/to/ts/bin/tsxs
-  # 2. MOD_FCGI_DIR   			--specify the directory where ats_mod_fcgi plugin src is present.
-  # 3. TRAFFIC_SERVER_SRC_DIR		--path to traffic server src directory 
-  # 4. TRAFFIC_SERVER_EXEC_DIR    --path to traffic server exec directory
+# 1. ATS_SRC		--either set or export env variable path to traffic server src directory
+# 2. ATS_EXEC       --either set or export env variable path to traffic server exec directory
 
-  Afterwords command, $> make && sudo make install
+  Afterwords command, $> make && sudo -E make install
 ------------------------------------------------------------------------------
 
 ATS (Apache Traffic Server) FastCGI Plugin

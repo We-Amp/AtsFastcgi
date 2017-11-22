@@ -99,26 +99,8 @@ public:
       fcgiRequest(nullptr),
       request_id(request_id)
   {
-    std::map<std::string, std::string> requestHeaders = GetFcgiRequestHeaders();
-    int contentLength        = 0;
-    Transaction &transaction = utils::internal::getTransaction(txn_);
-    // Retriving headers inside local Headers to build  request as per config
-    // later
-    Headers &h = transaction.getClientRequest().getHeaders();
-    if (h.isInitialized()) {
-      cout << "Header Count: " << h.size() << endl;
-      // using atscppapi::header_field_iterator;
-      // header_field_iterator iter = h.begin();
-      // it = &h;
-      // it = h.find("CONTENT_LENGTH");
-      // cout<<it->first<<" => "<<it->second<<endl;
-    }
-    fcgiRequest = new FCGIClientRequest(request_id, contentLength);
+    fcgiRequest = new FCGIClientRequest(request_id, txn);
   };
-
-  // static request headers for testing purpose
-  std::map<std::string, std::string> GetFcgiRequestHeaders();
-  void printFCGIRequestHeaders(std::map<std::string, std::string>);
   void closeServer();
 };
 
