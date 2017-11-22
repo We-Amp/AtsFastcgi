@@ -96,7 +96,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     // fcgiRequest->print_bytes(clientReq,reqLen);
     server->writeio.phpWrite(server->vc_, contp, clientReq, reqLen);
     server->readio.read(server->vc_, contp);
-    TSDebug(PLUGIN_NAME, "Connected to FCGI Server. WriteIO.vio :%d \t ReadIO.vio :%d ", server->writeio.vio, server->readio.vio);
+    TSDebug(PLUGIN_NAME, "Connected to FCGI Server. WriteIO.vio :%p \t ReadIO.vio :%p ", server->writeio.vio, server->readio.vio);
   } break;
 
   case TS_EVENT_NET_CONNECT_FAILED: {
@@ -111,7 +111,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   }
 
   case TS_EVENT_VCONN_WRITE_READY: {
-    TSDebug(PLUGIN_NAME, "Write Ready.WriteIO.vio yet to write : %d bytes.", TSVIONTodoGet(server->writeio.vio));
+    TSDebug(PLUGIN_NAME, "Write Ready.WriteIO.vio yet to write : %ld bytes.", TSVIONTodoGet(server->writeio.vio));
 
     return TS_EVENT_NONE;
   } break;
@@ -167,7 +167,7 @@ FastCGIIntercept::initServer()
   contp = TSContCreate(handlePHPConnectionEvents, TSMutexCreate());
   TSContDataSet(contp, this);
   TSNetConnect(contp, (struct sockaddr const *)&ip_addr);
-  TSDebug(PLUGIN_NAME, "FastCGIIntercept::initServer : Data Set Contp: %d", contp);
+  TSDebug(PLUGIN_NAME, "FastCGIIntercept::initServer : Data Set Contp: %p", contp);
   return contp;
 }
 

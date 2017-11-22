@@ -48,13 +48,13 @@ struct FCGIClientState;
 
 struct FCGIRecordList {
   FCGI_Header *header;
-  void *content;
+  uchar *content;
   size_t offset, length;
   FCGI_State state;
   struct FCGIRecordList *next;
-  FCGIRecordList(){
 
-  };
+  FCGIRecordList(){};
+
   ~FCGIRecordList()
   {
     TSfree(header);
@@ -82,6 +82,7 @@ public:
   uint32_t serializeNameValue(uchar *buffer, std::map<std::string, std::string>::iterator it);
   uint32_t serializePostData(uchar *buffer, std::string str);
   unsigned char *addClientRequest(std::string data, int &, std::map<std::string, std::string> fcgiReqHeaders);
+
   // Response Decoding member functions
   void fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, FCGIRecordList **head);
   FCGIRecordList *fcgiRecordCreate();
