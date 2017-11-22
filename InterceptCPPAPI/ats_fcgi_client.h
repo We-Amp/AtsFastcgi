@@ -48,7 +48,7 @@ struct FCGIClientState;
 
 struct FCGIRecordList {
   FCGI_Header *header;
-  void *content;
+  uchar *content;
   size_t offset, length;
   FCGI_State state;
   struct FCGIRecordList *next;

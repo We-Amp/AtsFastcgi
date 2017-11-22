@@ -23,9 +23,6 @@ using namespace atscppapi;
 
 using namespace FCGIClient;
 
-static in_addr_t server_ip;
-static int server_port;
-
 struct InterceptIOChannel {
   TSVIO vio;
   TSIOBuffer iobuf;
@@ -71,9 +68,8 @@ struct InterceptIOChannel {
     TSReleaseAssert((this->reader = TSIOBufferReaderAlloc(this->iobuf)));
     int num_bytes_written = TSIOBufferWrite(this->iobuf, (const void *)buf, data_size);
     if (num_bytes_written != data_size) {
-      TSError(PLUGIN_NAME, "Error while writing to buffer! Attempted %d bytes "
-                           "but only wrote %d bytes",
-              data_size, num_bytes_written);
+      TSError("%s Error while writing to buffer! Attempted %d bytes but only wrote %d bytes", PLUGIN_NAME, data_size,
+              num_bytes_written);
     }
     this->vio = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
   }
@@ -92,16 +88,16 @@ public:
   int request_id;
 
   InterceptIO(int request_id, TSHttpTxn txn)
-    : request_id(request_id),
+    : vc_(nullptr),
       txn_(txn),
-      vc_(nullptr),
       contp_(nullptr),
       clientData(""),
       clientRequestBody(""),
       serverResponse(""),
       readio(),
       writeio(),
-      fcgiRequest(nullptr)
+      fcgiRequest(nullptr),
+      request_id(request_id)
   {
     std::map<std::string, std::string> requestHeaders = GetFcgiRequestHeaders();
     int contentLength        = 0;
@@ -148,6 +144,3 @@ public:
     server->closeServer();
   }
 };
-
-static int handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata);
-int64_t InterceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest);

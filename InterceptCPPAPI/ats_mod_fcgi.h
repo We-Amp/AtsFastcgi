@@ -14,12 +14,14 @@
 #include <atscppapi/Logger.h>
 
 using namespace atscppapi;
+
 namespace fcgiGlobal
 {
 extern Logger log;
 extern GlobalPlugin *plugin;
 extern fcgiPluginData *plugin_data;
 }
+
 /*
  * # of idle seconds allowed to pass while connected to a FastCGI before
  * aborting

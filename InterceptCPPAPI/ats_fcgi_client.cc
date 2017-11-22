@@ -13,19 +13,12 @@ struct FCGIClient::FCGIClientState {
   FCGI_Header *header, *postHeader;
   unsigned char *buff, *pBuffInc;
   FCGIRecordList *records = nullptr;
-
   std::map<string, string> requestHeaders;
   int request_id_;
-  FCGIClientState()
-    : request_id_(0),
-      request(nullptr),
-      header(nullptr),
-      postHeader(nullptr),
-      buff(nullptr),
-      records(nullptr),
-      pBuffInc(nullptr){
 
-      };
+  FCGIClientState()
+    : request(nullptr), header(nullptr), postHeader(nullptr), buff(nullptr), pBuffInc(nullptr), records(nullptr), request_id_(0){};
+
   ~FCGIClientState()
   {
     request_id_ = 0;
@@ -81,7 +74,7 @@ FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReq
   state_->pBuffInc += sizeof(FCGI_Header);
   serialize(state_->pBuffInc, state_->request->body, sizeof(FCGI_BeginRequestBody));
   state_->pBuffInc += sizeof(FCGI_BeginRequestBody);
-  TSDebug(PLUGIN_NAME, "Header Len: %d ", state_->pBuffInc - state_->buff);
+  TSDebug(PLUGIN_NAME, "Header Len: %ld ", state_->pBuffInc - state_->buff);
   // FCGI Params headers
   state_->header = createHeader(FCGI_PARAMS);
   int len = 0, nb = 0;
@@ -126,7 +119,7 @@ FCGIClientRequest::createBeginRequest(std::map<std::string, std::string> fcgiReq
     state_->postHeader->contentLengthB1 = 0;
     serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
     state_->pBuffInc += sizeof(FCGI_Header);
-    TSDebug(PLUGIN_NAME, "Post Header Len: %d ", state_->pBuffInc - state_->buff);
+    TSDebug(PLUGIN_NAME, "Post Header Len: %ld ", state_->pBuffInc - state_->buff);
   }
 
   return state_->request;
@@ -137,18 +130,6 @@ FCGIClientRequest::addClientRequest(string data, int &dataLen, std::map<std::str
 {
   dataLen = state_->pBuffInc - state_->buff;
   return state_->buff;
-
-  // using namespace FCGIResponder;
-  // Responder *r;
-  // r = new Responder(1);
-  // //name=Rahul&email=g@mail.com
-  // string post(""),req;
-  // req = r->request(fcgiReqHeaders,post);
-  // dataLen = req.length();
-  // memcpy(state_->pBuffInc,req.c_str(),dataLen);
-
-  // //state_->pBuffInc +=request.length();
-  // return state_->buff;
 }
 
 void
@@ -193,7 +174,7 @@ uint32_t
 FCGIClientRequest::serializePostData(uchar *buffer, std::string str)
 {
   uchar *p = buffer;
-  uint32_t nl, vl;
+  uint32_t nl;
   nl = str.length();
   if (nl < 128)
     *p++ = BYTE_0(nl);
@@ -316,7 +297,9 @@ FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecor
   else {
     cpy_len = nb;
   }
+
   memcpy(rec->content + offset, *beg_buf, cpy_len);
+
   if (tot_len <= nb) {
     rec->offset += tot_len;
     *state = fcgi_state_done;
@@ -333,6 +316,7 @@ FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecor
     *beg_buf += nb;
     return FCGI_PROCESS_AGAIN;
   }
+
   return 0;
 }
 
@@ -349,7 +333,7 @@ FCGIClientRequest::fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecord
   }
   if (rec->state == fcgi_state_content_begin) {
     rec->length  = fcgiHeaderGetContentLen(rec->header);
-    rec->content = TSmalloc(rec->length);
+    rec->content = (uchar *)TSmalloc(rec->length);
     rec->state   = (FCGI_State)(int(rec->state) + 1);
   }
 
