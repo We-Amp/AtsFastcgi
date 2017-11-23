@@ -62,6 +62,13 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
       cout << "Content Length Value: " << value << endl;
       state_->requestHeaders["CONTENT_LENGTH"] = value.c_str();
       // TODO atscppapi::header_field_value_iterator hfv = hf.begin();
+      key = string("Content-type");
+      it  = h.find(key);
+      HeaderField hf1(*it);
+      value = "";
+      value = hf1.values(value);
+      cout << "Content TYPE Value: " << value << endl;
+      state_->requestHeaders["CONTENT_TYPE"] = value.c_str();
     }
 
     int contentLength = 0;
@@ -69,7 +76,6 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
     stringstream strToInt(cl);
     strToInt >> contentLength;
     cout << "Content Length to Int" << contentLength << endl;
-
     state_->buff = (unsigned char *)TSmalloc(BUF_SIZE + contentLength);
   } else {
     state_->buff = (unsigned char *)TSmalloc(BUF_SIZE);

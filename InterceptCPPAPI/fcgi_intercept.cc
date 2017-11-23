@@ -23,7 +23,6 @@ FastCGIIntercept::consume(const string &data, InterceptPlugin::RequestDataType t
     cout << "Read request header data" << endl << data;
     server->clientData += data;
   } else {
-    cout << "Read request body data" << endl << data << endl;
     server->clientRequestBody += data;
   }
 }

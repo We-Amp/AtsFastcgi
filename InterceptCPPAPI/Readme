@@ -102,3 +102,27 @@ Meaning of these configurable options:
         root directory path from where fcgi server will server resources/web_contents
         
 
+
+
+ PHP REQUIREMENTS
+
+  This section outlines build requirements for different OS
+  distributions. This may be out of date compared to the on-line
+  requirements at
+
+  <https://cwiki.apache.org/confluence/display/TS/Building>.
+
+  As of ATS v7.0.0 and later, gcc 4.8.1 or later is required, since we now use
+  and require the C++11 standard.
+
+  a. download libfcgi-dev package :i.e libfcgi-dev_2.4.0-8.4+b1_arm64.deb from https://packages.debian.org/sid/arm64/libfcgi-dev/download
+ 
+  b. download php7.0-cli php7.0-fpm with :  sudo apt-get install php7.0-cli php7.0-fpm
+
+
+Starting the php fastcgi server:
+
+$ > ./bin/php-fastcgi start      //this will start the server on port 60000
+
+Note: Place sample scripts from  ./examples/*  files to /var/www/ directory to access php scripts from browser. As php server uses default location as /var/www/html/*.php
+
