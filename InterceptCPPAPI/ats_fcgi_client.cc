@@ -141,7 +141,8 @@ FCGIClientRequest::createHeader(uchar type)
 FCGI_BeginRequest *
 FCGIClientRequest::createBeginRequest()
 {
-  state_->request               = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
+  state_->request = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
+  // TODO send the request id here
   state_->request->header       = createHeader(FCGI_BEGIN_REQUEST);
   state_->request->body         = (FCGI_BeginRequestBody *)calloc(1, sizeof(FCGI_BeginRequestBody));
   state_->request->body->roleB0 = FCGI_RESPONDER;

@@ -1,3 +1,6 @@
+#ifndef _FCGI_INTERCEPT_H_
+#define _FCGI_INTERCEPT_H_
+
 #include "ats_fcgi_client.h"
 #include "ats_mod_fcgi.h"
 #include "atscppapi/Transaction.h"
@@ -80,27 +83,14 @@ class InterceptIO
 public:
   TSVConn vc_;
   TSHttpTxn txn_;
-  TSCont contp_;
+  // TSCont contp_;
   string clientData, clientRequestBody, serverResponse;
   InterceptIOChannel readio;
   InterceptIOChannel writeio;
   FCGIClientRequest *fcgiRequest;
   int request_id;
 
-  InterceptIO(int request_id, TSHttpTxn txn)
-    : vc_(nullptr),
-      txn_(txn),
-      contp_(nullptr),
-      clientData(""),
-      clientRequestBody(""),
-      serverResponse(""),
-      readio(),
-      writeio(),
-      fcgiRequest(nullptr),
-      request_id(request_id)
-  {
-    fcgiRequest = new FCGIClientRequest(request_id, txn);
-  };
+  InterceptIO(int request_id, TSHttpTxn txn);
   void closeServer();
 };
 
@@ -108,6 +98,9 @@ class FastCGIIntercept : public InterceptPlugin
 {
 public:
   class InterceptIO *server;
+  // TODO Check when to release it
+  TSCont contp_;
+
   FastCGIIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
   {
     int request_id = 1;
@@ -115,14 +108,34 @@ public:
     server         = new InterceptIO(request_id, txn);
     TSDebug(PLUGIN_NAME, "FastCGIIntercept : Added Server intercept");
   }
-  void consume(const string &data, InterceptPlugin::RequestDataType type) override;
-  void handleInputComplete() override;
-  TSCont initServer();
-  void writeResponseChunkToATS();
-  void setResponseOutputComplete();
+
   ~FastCGIIntercept() override
   {
     TSDebug(PLUGIN_NAME, "~FastCGIIntercept : Shutting down server intercept");
     server->closeServer();
   }
+
+  void consume(const string &data, InterceptPlugin::RequestDataType type) override;
+  void handleInputComplete() override;
+
+  void initServer();
+
+  void writeResponseChunkToATS();
+  void setResponseOutputComplete();
+
+  void
+  setRequestId(uint request_id)
+  {
+    _request_id = request_id;
+  }
+  uint
+  requestId()
+  {
+    return _request_id;
+  }
+
+private:
+  uint _request_id;
 };
+
+#endif

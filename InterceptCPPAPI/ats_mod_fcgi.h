@@ -11,15 +11,17 @@
 
 #include "ats_fcgi_config.h"
 #include <atscppapi/GlobalPlugin.h>
-#include <atscppapi/Logger.h>
+#include "fcgi_server.h"
 
 using namespace atscppapi;
 
+class FCGIServer;
+
 namespace fcgiGlobal
 {
-extern Logger log;
 extern GlobalPlugin *plugin;
 extern fcgiPluginData *plugin_data;
+extern FCGIServer *fcgi_server;
 }
 
 /*
