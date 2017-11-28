@@ -2,6 +2,7 @@
 #include "ats_mod_fcgi.h"
 #include "fcgi_protocol.h"
 #include "ts/ink_defs.h"
+#include <cstring> //for memcpy
 #include <iostream>
 #include <sstream>
 #include <string>
