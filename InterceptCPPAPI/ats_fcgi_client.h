@@ -87,19 +87,23 @@ public:
   unsigned char *addClientRequest(std::string data, int &);
 
   // Response Decoding member functions
-  void fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, FCGIRecordList **head);
+  void fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::string &output);
   FCGIRecordList *fcgiRecordCreate();
   int fcgiProcessHeader(uchar ch, FCGIRecordList *rec);
   int fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec);
   int fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec);
 
-  void fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain);
+  void fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::string &output);
   std::string writeToServerObj();
 
   void print_bytes(uchar *buf, int n);
 
 protected:
   struct FCGIClientState *state_;
+
+private:
+  bool first_chunk;
+  FCGIRecordList *_headerRecord;
 };
 }
 
