@@ -22,16 +22,31 @@ FastCGIIntercept::consume(const string &data, InterceptPlugin::RequestDataType t
 {
   if (type == InterceptPlugin::REQUEST_HEADER) {
     cout << "Read request header data" << endl << data;
-    server->clientData += data;
+    streamReqHeader(data);
+
   } else {
-    server->clientRequestBody += data;
+    streamReqBody(data);
   }
+}
+
+void
+FastCGIIntercept::streamReqHeader(const string &data)
+{
+  cout << "streamReqHeader: " << headCount++ << endl;
+  FCGIServer::server()->writeRequestHeader(_request_id);
+}
+void
+FastCGIIntercept::streamReqBody(const string &data)
+{
+  cout << "streamReqBody: " << bodyCount++ << endl;
+  FCGIServer::server()->writeRequestBody(_request_id, data);
 }
 
 void
 FastCGIIntercept::handleInputComplete()
 {
-  FCGIServer::server()->writeToServer(_request_id);
+  cout << "HandleInputComplete: " << emptyCount++ << endl;
+  FCGIServer::server()->writeRequestBodyComplete(_request_id);
 }
 
 void
@@ -44,11 +59,6 @@ void
 FastCGIIntercept::setResponseOutputComplete()
 {
   InterceptPlugin::setOutputComplete();
-}
-
-void
-FastCGIIntercept::initServer()
-{
 }
 
 InterceptIO::InterceptIO(int request_id, TSHttpTxn txn)

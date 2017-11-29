@@ -30,8 +30,8 @@ struct InterceptIOChannel {
   TSVIO vio;
   TSIOBuffer iobuf;
   TSIOBufferReader reader;
-
-  InterceptIOChannel() : vio(nullptr), iobuf(nullptr), reader(nullptr) {}
+  int total_bytes_written;
+  InterceptIOChannel() : vio(nullptr), iobuf(nullptr), reader(nullptr), total_bytes_written(0) {}
   ~InterceptIOChannel()
   {
     if (this->reader) {
@@ -41,6 +41,7 @@ struct InterceptIOChannel {
     if (this->iobuf) {
       TSIOBufferDestroy(this->iobuf);
     }
+    total_bytes_written = 0;
   }
 
   void
@@ -66,15 +67,19 @@ struct InterceptIOChannel {
   void
   phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size)
   {
-    TSReleaseAssert(this->vio == nullptr);
-    TSReleaseAssert((this->iobuf = TSIOBufferCreate()));
-    TSReleaseAssert((this->reader = TSIOBufferReaderAlloc(this->iobuf)));
+    if (!this->iobuf) {
+      this->iobuf  = TSIOBufferCreate();
+      this->reader = TSIOBufferReaderAlloc(this->iobuf);
+      this->vio    = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
+    }
     int num_bytes_written = TSIOBufferWrite(this->iobuf, (const void *)buf, data_size);
     if (num_bytes_written != data_size) {
       TSError("%s Error while writing to buffer! Attempted %d bytes but only wrote %d bytes", PLUGIN_NAME, data_size,
               num_bytes_written);
     }
-    this->vio = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
+    total_bytes_written += data_size;
+    cout << "Wrote " << total_bytes_written << " bytes on PHP side" << endl;
+    TSVIOReenable(this->vio);
   }
 };
 
@@ -98,6 +103,7 @@ class FastCGIIntercept : public InterceptPlugin
 {
 public:
   class InterceptIO *server;
+  int headCount = 0, bodyCount = 0, emptyCount = 0;
   // TODO Check when to release it
   TSCont contp_;
 
@@ -117,8 +123,8 @@ public:
 
   void consume(const string &data, InterceptPlugin::RequestDataType type) override;
   void handleInputComplete() override;
-
-  void initServer();
+  void streamReqHeader(const string &data);
+  void streamReqBody(const string &data);
 
   void writeResponseChunkToATS();
   void setResponseOutputComplete();

@@ -40,7 +40,6 @@ interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
   TSVIONDoneSet(server->readio.vio, TSVIONDoneGet(server->readio.vio) + consumed);
 
   server->serverResponse = std::move(output);
-  cout << "Server Response:" << endl << server->serverResponse << endl;
 }
 
 static int
@@ -81,7 +80,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_WRITE_READY: {
     TSDebug(PLUGIN_NAME, "Write Ready.WriteIO.vio yet to write : %ld bytes.", TSVIONTodoGet(server->writeio.vio));
-
     return TS_EVENT_NONE;
   }
 
@@ -128,22 +126,44 @@ FCGIServer::getIntercept(uint request_id)
 }
 
 void
-FCGIServer::writeToServer(uint request_id)
+FCGIServer::writeRequestHeader(uint request_id)
+{
+  FastCGIIntercept *fcgi         = getIntercept(request_id);
+  InterceptIO *server            = fcgi->server;
+  FCGIClientRequest *fcgiRequest = fcgi->server->fcgiRequest;
+  unsigned char *clientReq;
+  int reqLen = 0;
+
+  fcgiRequest->createBeginRequest();
+  clientReq = fcgiRequest->addClientRequest(reqLen);
+  server->writeio.phpWrite(server->vc_, fcgi->contp_, clientReq, reqLen);
+}
+
+void
+FCGIServer::writeRequestBody(uint request_id, const string &data)
 {
   FastCGIIntercept *fcgi         = getIntercept(request_id);
   InterceptIO *server            = fcgi->server;
   FCGIClientRequest *fcgiRequest = fcgi->server->fcgiRequest;
 
-  // create a php request according to client requested appropriate headers
-  string clientData;
   unsigned char *clientReq;
   int reqLen            = 0;
-  fcgiRequest->postData = server->clientRequestBody;
-  // TODO send request id here
-  fcgiRequest->createBeginRequest();
-  clientReq = fcgiRequest->addClientRequest(server->clientData, reqLen);
-  // To Print FCGIRequest Headers
-  // fcgiRequest->print_bytes(clientReq,reqLen);
+  fcgiRequest->postData = data;
+  fcgiRequest->postBodyChunk();
+  clientReq = fcgiRequest->addClientRequest(reqLen);
+  server->writeio.phpWrite(server->vc_, fcgi->contp_, clientReq, reqLen);
+}
+void
+FCGIServer::writeRequestBodyComplete(uint request_id)
+{
+  FastCGIIntercept *fcgi         = getIntercept(request_id);
+  InterceptIO *server            = fcgi->server;
+  FCGIClientRequest *fcgiRequest = fcgi->server->fcgiRequest;
+
+  unsigned char *clientReq;
+  int reqLen = 0;
+  fcgiRequest->emptyParam();
+  clientReq = fcgiRequest->addClientRequest(reqLen);
   server->writeio.phpWrite(server->vc_, fcgi->contp_, clientReq, reqLen);
   server->readio.read(server->vc_, fcgi->contp_);
 }
@@ -178,10 +198,9 @@ FCGIServer::connect(FastCGIIntercept *intercept)
   // php server
   contp = TSContCreate(handlePHPConnectionEvents, TSMutexCreate());
   TSContDataSet(contp, new RequestIntercept(request_id, this));
+  intercept->contp_ = contp;
   TSNetConnect(contp, (struct sockaddr const *)&ip_addr);
   TSDebug(PLUGIN_NAME, "FastCGIIntercept::initServer : Data Set Contp: %p", contp);
-
-  intercept->contp_ = contp;
 
   return request_id;
 }

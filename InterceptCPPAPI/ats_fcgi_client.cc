@@ -133,6 +133,21 @@ FCGIClientRequest::printFCGIRequestHeaders()
   }
 }
 
+void
+FCGIClientRequest::emptyParam()
+{
+  string str("POST");
+  state_->pBuffInc = state_->buff;
+  if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
+    TSDebug(PLUGIN_NAME, "empty Post Header Len: %ld ", state_->pBuffInc - state_->buff);
+  } else {
+    state_->postHeader                  = createHeader(FCGI_STDIN);
+    state_->postHeader->contentLengthB0 = 0;
+    state_->postHeader->contentLengthB1 = 0;
+    serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
+    state_->pBuffInc += sizeof(FCGI_Header);
+  }
+}
 FCGI_Header *
 FCGIClientRequest::createHeader(uchar type)
 {
@@ -184,34 +199,33 @@ FCGIClientRequest::createBeginRequest()
   state_->header->contentLengthB1 = 0;
   serialize(state_->pBuffInc, state_->header, sizeof(FCGI_Header));
   state_->pBuffInc += sizeof(FCGI_Header);
-
-  string str("POST");
-  if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
-    TSDebug(PLUGIN_NAME, "serializing post data");
-    int dataLen        = 0;
-    state_->postHeader = createHeader(FCGI_STDIN);
-    dataLen            = postData.length();
-
-    state_->postHeader->contentLengthB0 = BYTE_0(dataLen);
-    state_->postHeader->contentLengthB1 = BYTE_1(dataLen);
-    serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
-    state_->pBuffInc += sizeof(FCGI_Header);
-    // serializePostData(state_->pBuffInc,postData);
-    memcpy(state_->pBuffInc, postData.c_str(), dataLen);
-    state_->pBuffInc += dataLen;
-
-    state_->postHeader->contentLengthB0 = 0;
-    state_->postHeader->contentLengthB1 = 0;
-    serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
-    state_->pBuffInc += sizeof(FCGI_Header);
-    TSDebug(PLUGIN_NAME, "Post Header Len: %ld ", state_->pBuffInc - state_->buff);
-  }
-
   return state_->request;
 }
 
+void
+FCGIClientRequest::postBodyChunk()
+{
+  TSDebug(PLUGIN_NAME, "serializing post data");
+  state_->pBuffInc   = state_->buff;
+  int dataLen        = 0;
+  state_->postHeader = createHeader(FCGI_STDIN);
+  dataLen            = postData.length();
+
+  state_->postHeader->contentLengthB0 = BYTE_0(dataLen);
+  state_->postHeader->contentLengthB1 = BYTE_1(dataLen);
+  serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
+  state_->pBuffInc += sizeof(FCGI_Header);
+  memcpy(state_->pBuffInc, postData.c_str(), dataLen);
+  state_->pBuffInc += dataLen;
+
+  state_->postHeader->contentLengthB0 = 0;
+  state_->postHeader->contentLengthB1 = 0;
+  serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
+  state_->pBuffInc += sizeof(FCGI_Header);
+  TSDebug(PLUGIN_NAME, "Post Header Len: %ld ", state_->pBuffInc - state_->buff);
+}
 unsigned char *
-FCGIClientRequest::addClientRequest(string data, int &dataLen)
+FCGIClientRequest::addClientRequest(int &dataLen)
 {
   dataLen = state_->pBuffInc - state_->buff;
   return state_->buff;
