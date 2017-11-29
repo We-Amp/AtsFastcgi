@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 #include <ts/ts.h>
+#include <cstring> //for memcpy
 
 #define BUF_SIZE 5000
 
@@ -49,17 +50,19 @@ struct FCGIClientState;
 struct FCGIRecordList {
   FCGI_Header *header;
   uchar *content;
-  size_t offset, length;
   FCGI_State state;
-  struct FCGIRecordList *next;
+  size_t length, offset;
 
-  FCGIRecordList(){};
+  FCGIRecordList() : content(nullptr), state(FCGI_State::fcgi_state_version), length(0), offset(0)
+  {
+    header = (FCGI_Header *)TSmalloc(sizeof(FCGI_Header));
+    memset(header, 0, sizeof(FCGI_Header));
+  };
 
   ~FCGIRecordList()
   {
     TSfree(header);
     TSfree(content);
-    TSfree(next);
   }
 };
 
@@ -94,7 +97,6 @@ public:
   int fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec);
 
   void fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::string &output);
-  std::string writeToServerObj();
 
   void print_bytes(uchar *buf, int n);
 

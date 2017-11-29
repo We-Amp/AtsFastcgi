@@ -2,7 +2,6 @@
 #include "ats_mod_fcgi.h"
 #include "fcgi_protocol.h"
 #include "ts/ink_defs.h"
-#include <cstring> //for memcpy
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -91,6 +90,9 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
 // holding respose records received from fcgi server
 FCGIClientRequest::~FCGIClientRequest()
 {
+  if (_headerRecord)
+    delete _headerRecord;
+
   delete state_;
 }
 
@@ -296,23 +298,6 @@ FCGIClientRequest::fcgiHeaderGetContentLen(FCGI_Header *h)
   return (h->contentLengthB1 << 8) + h->contentLengthB0;
 }
 
-FCGIRecordList *
-FCGIClientRequest::fcgiRecordCreate()
-{
-  FCGIRecordList *tmp = (FCGIRecordList *)TSmalloc(sizeof(FCGIRecordList));
-
-  tmp->header = (FCGI_Header *)TSmalloc(sizeof(FCGI_Header));
-  memset(tmp->header, 0, sizeof(FCGI_Header));
-
-  tmp->content = nullptr;
-  tmp->next    = nullptr;
-  tmp->state   = FCGI_State::fcgi_state_version;
-  tmp->length  = 0;
-  tmp->offset  = 0;
-
-  return tmp;
-}
-
 int
 FCGIClientRequest::fcgiProcessHeader(uchar ch, FCGIRecordList *rec)
 {
@@ -432,15 +417,13 @@ void
 FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::string &output)
 {
   if (!_headerRecord)
-    _headerRecord = fcgiRecordCreate();
+    _headerRecord = new FCGIRecordList;
 
   while (1) {
     if (_headerRecord->state == fcgi_state_done) {
       FCGIRecordList *tmp = _headerRecord;
-      _headerRecord       = fcgiRecordCreate();
-      TSfree(tmp->header);
-      TSfree(tmp->content);
-      TSfree(tmp);
+      _headerRecord       = new FCGIRecordList();
+      delete tmp;
     }
 
     if (fcgiProcessRecord(&beg_buf, end_buf, _headerRecord) == FCGI_PROCESS_DONE) {
@@ -463,43 +446,6 @@ FCGIClientRequest::fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::str
     first_chunk = false;
   }
   fcgiProcessBuffer((uchar *)beg_buf, (uchar *)beg_buf + (size_t)remain, output);
-}
-
-string
-FCGIClientRequest::writeToServerObj()
-{
-  FCGIRecordList *rec;
-  std::map<int, string> res;
-  string serverResponse;
-  int i = 0;
-
-  for (rec = state_->records; rec != nullptr;) {
-    if (rec->header->type == FCGI_STDOUT) {
-      string str1((const char *)rec->content, rec->length);
-      res[i] = str1;
-      i++;
-      TSfree(rec->content);
-      auto next = rec->next;
-      TSfree(rec);
-      rec = next;
-    } else {
-      state_->records = rec->next;
-    }
-  }
-
-  if (first_chunk) {
-    serverResponse = "HTTP/1.0 200 OK\r\n";
-    first_chunk    = false;
-  }
-
-  while (i >= 0) {
-    serverResponse += res[i];
-    i--;
-  }
-
-  // state_->records = nullptr;
-
-  return serverResponse;
 }
 
 void
