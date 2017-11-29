@@ -13,28 +13,34 @@ public:
   FCGIServer *server;
 };
 
-int64_t
+void
 interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
 {
   TSIOBufferBlock block;
   int64_t consumed       = 0;
   server->serverResponse = "";
+
+  std::string output;
+
   // Walk the list of buffer blocks in from the read VIO.
   for (block = TSIOBufferReaderStart(server->readio.reader); block; block = TSIOBufferBlockNext(block)) {
     int64_t remain = 0;
     const char *ptr;
     ptr = TSIOBufferBlockReadStart(block, server->readio.reader, &remain);
     if (remain) {
-      fcgiRequest->fcgiDecodeRecordChunk((uchar *)ptr, remain);
+      fcgiRequest->fcgiDecodeRecordChunk((uchar *)ptr, remain, output);
     }
     consumed += remain;
   }
+
   if (consumed) {
     cout << "InterceptTransferData: Read " << consumed << " Bytes from server and writing it to client side" << endl;
     TSIOBufferReaderConsume(server->readio.reader, consumed);
   }
   TSVIONDoneSet(server->readio.vio, TSVIONDoneGet(server->readio.vio) + consumed);
-  return consumed;
+
+  server->serverResponse = std::move(output);
+  cout << "Server Response:" << endl << server->serverResponse << endl;
 }
 
 static int
@@ -68,6 +74,8 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_VCONN_READ_READY: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Inside Read Ready...VConn Open ");
     interceptTransferData(server, fcgiRequest);
+
+    fcgi->writeResponseChunkToATS();
     break;
   }
 
@@ -84,9 +92,9 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Sending Response to client side");
     interceptTransferData(server, fcgiRequest);
-    server->serverResponse = fcgiRequest->writeToServerObj();
 
     fcgi->writeResponseChunkToATS();
+
     fcgi->setResponseOutputComplete();
     return TS_EVENT_NONE;
   }
