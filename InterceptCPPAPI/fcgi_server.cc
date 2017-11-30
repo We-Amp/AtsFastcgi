@@ -1,6 +1,8 @@
 
 #include "fcgi_server.h"
 
+#include <sstream>
+
 #include "fcgi_intercept.h"
 #include "ats_mod_fcgi.h"
 
@@ -20,7 +22,7 @@ interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
   int64_t consumed       = 0;
   server->serverResponse = "";
 
-  std::string output;
+  std::ostringstream output;
 
   // Walk the list of buffer blocks in from the read VIO.
   for (block = TSIOBufferReaderStart(server->readio.reader); block; block = TSIOBufferBlockNext(block)) {
@@ -39,7 +41,7 @@ interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
   }
   TSVIONDoneSet(server->readio.vio, TSVIONDoneGet(server->readio.vio) + consumed);
 
-  server->serverResponse = std::move(output);
+  server->serverResponse = std::move(output.str());
 }
 
 static int
