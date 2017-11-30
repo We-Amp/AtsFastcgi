@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 #include <ts/ts.h>
+#include <cstring> //for memcpy
 
 #define BUF_SIZE 5000
 
@@ -49,17 +50,19 @@ struct FCGIClientState;
 struct FCGIRecordList {
   FCGI_Header *header;
   uchar *content;
-  size_t offset, length;
   FCGI_State state;
-  struct FCGIRecordList *next;
+  size_t length, offset;
 
-  FCGIRecordList(){};
+  FCGIRecordList() : content(nullptr), state(FCGI_State::fcgi_state_version), length(0), offset(0)
+  {
+    header = (FCGI_Header *)TSmalloc(sizeof(FCGI_Header));
+    memset(header, 0, sizeof(FCGI_Header));
+  };
 
   ~FCGIRecordList()
   {
     TSfree(header);
     TSfree(content);
-    TSfree(next);
   }
 };
 
@@ -74,8 +77,10 @@ public:
   void printFCGIRequestHeaders();
 
   // Request Creation
-  FCGI_Header *createHeader(unsigned char type);
   FCGI_BeginRequest *createBeginRequest();
+  FCGI_Header *createHeader(unsigned char type);
+  void postBodyChunk();
+  void emptyParam();
 
   void serialize(uchar *buffer, void *st, size_t size);
   void fcgiHeaderSetRequestId(FCGI_Header *h, int request_id);
@@ -84,22 +89,25 @@ public:
 
   uint32_t serializeNameValue(uchar *buffer, std::map<std::string, std::string>::iterator it);
   uint32_t serializePostData(uchar *buffer, std::string str);
-  unsigned char *addClientRequest(std::string data, int &);
+  unsigned char *addClientRequest(int &);
 
   // Response Decoding member functions
-  void fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, FCGIRecordList **head);
+  void fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostringstream &output);
   FCGIRecordList *fcgiRecordCreate();
   int fcgiProcessHeader(uchar ch, FCGIRecordList *rec);
   int fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec);
   int fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec);
 
-  void fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain);
-  std::string writeToServerObj();
+  void fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::ostringstream &output);
 
   void print_bytes(uchar *buf, int n);
 
 protected:
   struct FCGIClientState *state_;
+
+private:
+  bool first_chunk;
+  FCGIRecordList *_headerRecord;
 };
 }
 

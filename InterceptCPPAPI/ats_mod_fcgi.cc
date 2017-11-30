@@ -13,6 +13,8 @@
 #include "ts/ts.h"
 #include "utils_internal.h"
 
+#include "fcgi_server.h"
+
 using namespace atscppapi;
 
 using std::cout;
@@ -28,9 +30,9 @@ using std::string;
  */
 namespace fcgiGlobal
 {
-Logger log;
 GlobalPlugin *plugin;
 fcgiPluginData *plugin_data;
+FCGIServer *fcgi_server;
 }
 using namespace fcgiGlobal;
 
@@ -42,7 +44,9 @@ public:
   handleReadRequestHeaders(Transaction &transaction) override
   {
     if (transaction.getClientRequest().getUrl().getPath().find(".php") != string::npos) {
-      transaction.addPlugin(new FastCGIIntercept(transaction));
+      auto intercept = new FastCGIIntercept(transaction);
+      transaction.addPlugin(intercept);
+      fcgi_server->connect(intercept);
     }
     transaction.resume();
   }
@@ -67,4 +71,6 @@ TSPluginInit(int argc, const char *argv[])
   } else {
     TSDebug(PLUGIN_NAME, " plugin is disabled.");
   }
+
+  fcgi_server = new FCGIServer();
 }

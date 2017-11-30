@@ -1,3 +1,6 @@
+#ifndef _FCGI_INTERCEPT_H_
+#define _FCGI_INTERCEPT_H_
+
 #include "ats_fcgi_client.h"
 #include "ats_mod_fcgi.h"
 #include "atscppapi/Transaction.h"
@@ -27,8 +30,8 @@ struct InterceptIOChannel {
   TSVIO vio;
   TSIOBuffer iobuf;
   TSIOBufferReader reader;
-
-  InterceptIOChannel() : vio(nullptr), iobuf(nullptr), reader(nullptr) {}
+  int total_bytes_written;
+  InterceptIOChannel() : vio(nullptr), iobuf(nullptr), reader(nullptr), total_bytes_written(0) {}
   ~InterceptIOChannel()
   {
     if (this->reader) {
@@ -38,6 +41,7 @@ struct InterceptIOChannel {
     if (this->iobuf) {
       TSIOBufferDestroy(this->iobuf);
     }
+    total_bytes_written = 0;
   }
 
   void
@@ -63,15 +67,19 @@ struct InterceptIOChannel {
   void
   phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size)
   {
-    TSReleaseAssert(this->vio == nullptr);
-    TSReleaseAssert((this->iobuf = TSIOBufferCreate()));
-    TSReleaseAssert((this->reader = TSIOBufferReaderAlloc(this->iobuf)));
+    if (!this->iobuf) {
+      this->iobuf  = TSIOBufferCreate();
+      this->reader = TSIOBufferReaderAlloc(this->iobuf);
+      this->vio    = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
+    }
     int num_bytes_written = TSIOBufferWrite(this->iobuf, (const void *)buf, data_size);
     if (num_bytes_written != data_size) {
       TSError("%s Error while writing to buffer! Attempted %d bytes but only wrote %d bytes", PLUGIN_NAME, data_size,
               num_bytes_written);
     }
-    this->vio = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
+    total_bytes_written += data_size;
+    cout << "Wrote " << total_bytes_written << " bytes on PHP side" << endl;
+    TSVIOReenable(this->vio);
   }
 };
 
@@ -80,27 +88,14 @@ class InterceptIO
 public:
   TSVConn vc_;
   TSHttpTxn txn_;
-  TSCont contp_;
+  // TSCont contp_;
   string clientData, clientRequestBody, serverResponse;
   InterceptIOChannel readio;
   InterceptIOChannel writeio;
   FCGIClientRequest *fcgiRequest;
   int request_id;
 
-  InterceptIO(int request_id, TSHttpTxn txn)
-    : vc_(nullptr),
-      txn_(txn),
-      contp_(nullptr),
-      clientData(""),
-      clientRequestBody(""),
-      serverResponse(""),
-      readio(),
-      writeio(),
-      fcgiRequest(nullptr),
-      request_id(request_id)
-  {
-    fcgiRequest = new FCGIClientRequest(request_id, txn);
-  };
+  InterceptIO(int request_id, TSHttpTxn txn);
   void closeServer();
 };
 
@@ -108,6 +103,10 @@ class FastCGIIntercept : public InterceptPlugin
 {
 public:
   class InterceptIO *server;
+  int headCount = 0, bodyCount = 0, emptyCount = 0;
+  // TODO Check when to release it
+  TSCont contp_;
+
   FastCGIIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
   {
     int request_id = 1;
@@ -115,14 +114,34 @@ public:
     server         = new InterceptIO(request_id, txn);
     TSDebug(PLUGIN_NAME, "FastCGIIntercept : Added Server intercept");
   }
-  void consume(const string &data, InterceptPlugin::RequestDataType type) override;
-  void handleInputComplete() override;
-  TSCont initServer();
-  void writeResponseChunkToATS();
-  void setResponseOutputComplete();
+
   ~FastCGIIntercept() override
   {
     TSDebug(PLUGIN_NAME, "~FastCGIIntercept : Shutting down server intercept");
     server->closeServer();
   }
+
+  void consume(const string &data, InterceptPlugin::RequestDataType type) override;
+  void handleInputComplete() override;
+  void streamReqHeader(const string &data);
+  void streamReqBody(const string &data);
+
+  void writeResponseChunkToATS();
+  void setResponseOutputComplete();
+
+  void
+  setRequestId(uint request_id)
+  {
+    _request_id = request_id;
+  }
+  uint
+  requestId()
+  {
+    return _request_id;
+  }
+
+private:
+  uint _request_id;
 };
+
+#endif
