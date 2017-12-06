@@ -17,6 +17,14 @@
 using namespace fcgiGlobal;
 using namespace atscppapi;
 
+FastCGIIntercept::~FastCGIIntercept()
+{
+  TSDebug(PLUGIN_NAME, "~FastCGIIntercept : Shutting down server intercept");
+  FCGIServer::server()->removeIntercept(_request_id, contp_);
+  TSContDestroy(contp_);
+  server->closeServer();
+}
+
 void
 FastCGIIntercept::consume(const string &data, InterceptPlugin::RequestDataType type)
 {
@@ -83,7 +91,6 @@ InterceptIO::closeServer()
   if (this->vc_) {
     TSVConnClose(this->vc_);
   }
-  // TSContDestroy(this->contp_);
   this->vc_        = nullptr;
   this->readio.vio = this->writeio.vio = nullptr;
   this->txn_                           = nullptr;

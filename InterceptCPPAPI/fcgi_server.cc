@@ -128,6 +128,18 @@ FCGIServer::getIntercept(uint request_id)
 }
 
 void
+FCGIServer::removeIntercept(uint request_id, TSCont contp)
+{
+  auto itr = request_list.find(request_id);
+  if (itr != request_list.end()) {
+    request_list.erase(itr);
+  }
+
+  RequestIntercept *req_intercept = (RequestIntercept *)TSContDataGet(contp);
+  delete req_intercept;
+}
+
+void
 FCGIServer::writeRequestHeader(uint request_id)
 {
   FastCGIIntercept *fcgi         = getIntercept(request_id);

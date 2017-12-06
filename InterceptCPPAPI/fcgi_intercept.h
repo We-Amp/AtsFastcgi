@@ -88,7 +88,6 @@ class InterceptIO
 public:
   TSVConn vc_;
   TSHttpTxn txn_;
-  // TSCont contp_;
   string clientData, clientRequestBody, serverResponse;
   InterceptIOChannel readio;
   InterceptIOChannel writeio;
@@ -104,7 +103,6 @@ class FastCGIIntercept : public InterceptPlugin
 public:
   class InterceptIO *server;
   int headCount = 0, bodyCount = 0, emptyCount = 0;
-  // TODO Check when to release it
   TSCont contp_;
 
   FastCGIIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
@@ -115,11 +113,7 @@ public:
     TSDebug(PLUGIN_NAME, "FastCGIIntercept : Added Server intercept");
   }
 
-  ~FastCGIIntercept() override
-  {
-    TSDebug(PLUGIN_NAME, "~FastCGIIntercept : Shutting down server intercept");
-    server->closeServer();
-  }
+  ~FastCGIIntercept() override;
 
   void consume(const string &data, InterceptPlugin::RequestDataType type) override;
   void handleInputComplete() override;

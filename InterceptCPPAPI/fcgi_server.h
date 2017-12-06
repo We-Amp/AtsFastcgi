@@ -27,6 +27,7 @@ public:
   const uint connect(FastCGIIntercept *intercept);
 
   FastCGIIntercept *getIntercept(uint request_id);
+  void removeIntercept(uint request_id, TSCont contp);
 
   void writeRequestHeader(uint request_id);
   void writeRequestBody(uint request_id, const std::string &data);
