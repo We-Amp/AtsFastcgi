@@ -427,7 +427,7 @@ FCGIClientRequest::fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecord
   return fcgiProcessContent(beg_buf, end_buf, rec);
 }
 
-void
+bool
 FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostringstream &output)
 {
   if (!_headerRecord)
@@ -445,21 +445,25 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
         output << std::string((const char *)_headerRecord->content, _headerRecord->length);
         printf("\n\nwriting to stdout stream\n\n");
       }
+      if (_headerRecord->header->type == FCGI_END_REQUEST) {
+        printf("\n\nResponse complete. FCGI_END_REQUEST\n\n");
+        return true;
+      }
     }
 
     if (beg_buf == end_buf)
-      return;
+      return false;
   }
 }
 
-void
+bool
 FCGIClientRequest::fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::ostringstream &output)
 {
   if (first_chunk) {
     output << "HTTP/1.0 200 OK\r\n";
     first_chunk = false;
   }
-  fcgiProcessBuffer((uchar *)beg_buf, (uchar *)beg_buf + (size_t)remain, output);
+  return fcgiProcessBuffer((uchar *)beg_buf, (uchar *)beg_buf + (size_t)remain, output);
 }
 
 void
