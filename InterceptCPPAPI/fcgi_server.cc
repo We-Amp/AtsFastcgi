@@ -15,11 +15,12 @@ public:
   FCGIServer *server;
 };
 
-void
+int
 interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
 {
   TSIOBufferBlock block;
   int64_t consumed       = 0;
+  int responseStatus     = -1;
   server->serverResponse = "";
 
   std::ostringstream output;
@@ -30,7 +31,7 @@ interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
     const char *ptr;
     ptr = TSIOBufferBlockReadStart(block, server->readio.reader, &remain);
     if (remain) {
-      fcgiRequest->fcgiDecodeRecordChunk((uchar *)ptr, remain, output);
+      responseStatus = fcgiRequest->fcgiDecodeRecordChunk((uchar *)ptr, remain, output);
     }
     consumed += remain;
   }
@@ -42,6 +43,7 @@ interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
   TSVIONDoneSet(server->readio.vio, TSVIONDoneGet(server->readio.vio) + consumed);
 
   server->serverResponse = std::move(output.str());
+  return responseStatus;
 }
 
 static int
@@ -74,9 +76,13 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_READ_READY: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Inside Read Ready...VConn Open ");
-    interceptTransferData(server, fcgiRequest);
-
+    int responseStatus = 0;
+    responseStatus     = interceptTransferData(server, fcgiRequest);
     fcgi->writeResponseChunkToATS();
+    if (responseStatus == 1) {
+      TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: ResponseComplete...Sending Response to client stream.");
+      fcgi->setResponseOutputComplete();
+    }
     break;
   }
 
@@ -90,12 +96,14 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     return TS_EVENT_NONE;
 
   case TS_EVENT_VCONN_EOS: {
-    TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Sending Response to client side");
-    interceptTransferData(server, fcgiRequest);
-
+    TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS reached.");
+    int responseStatus = 0;
+    responseStatus     = interceptTransferData(server, fcgiRequest);
     fcgi->writeResponseChunkToATS();
-
-    fcgi->setResponseOutputComplete();
+    if (responseStatus == 1) {
+      TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS => Sending Response to client side");
+      fcgi->setResponseOutputComplete();
+    }
     return TS_EVENT_NONE;
   }
 
