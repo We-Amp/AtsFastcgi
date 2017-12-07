@@ -92,13 +92,13 @@ public:
   unsigned char *addClientRequest(int &);
 
   // Response Decoding member functions
-  int fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostringstream &output);
+  bool fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostringstream &output);
   FCGIRecordList *fcgiRecordCreate();
   int fcgiProcessHeader(uchar ch, FCGIRecordList *rec);
   int fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec);
   int fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecordList *rec);
 
-  int fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::ostringstream &output);
+  bool fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::ostringstream &output);
 
   void print_bytes(uchar *buf, int n);
 

@@ -15,12 +15,12 @@ public:
   FCGIServer *server;
 };
 
-int
+bool
 interceptTransferData(InterceptIO *server, FCGIClientRequest *fcgiRequest)
 {
   TSIOBufferBlock block;
   int64_t consumed       = 0;
-  int responseStatus     = -1;
+  bool responseStatus    = false;
   server->serverResponse = "";
 
   std::ostringstream output;
@@ -76,10 +76,10 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_READ_READY: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Inside Read Ready...VConn Open ");
-    int responseStatus = 0;
-    responseStatus     = interceptTransferData(server, fcgiRequest);
+    bool responseStatus = false;
+    responseStatus      = interceptTransferData(server, fcgiRequest);
     fcgi->writeResponseChunkToATS();
-    if (responseStatus == 1) {
+    if (responseStatus == true) {
       TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: ResponseComplete...Sending Response to client stream.");
       fcgi->setResponseOutputComplete();
     }
@@ -97,10 +97,10 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS reached.");
-    int responseStatus = 0;
-    responseStatus     = interceptTransferData(server, fcgiRequest);
+    bool responseStatus = false;
+    responseStatus      = interceptTransferData(server, fcgiRequest);
     fcgi->writeResponseChunkToATS();
-    if (responseStatus == 1) {
+    if (responseStatus == true) {
       TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS => Sending Response to client side");
       fcgi->setResponseOutputComplete();
     }

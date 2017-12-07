@@ -427,7 +427,7 @@ FCGIClientRequest::fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecord
   return fcgiProcessContent(beg_buf, end_buf, rec);
 }
 
-int
+bool
 FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostringstream &output)
 {
   if (!_headerRecord)
@@ -447,16 +447,16 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
       }
       if (_headerRecord->header->type == FCGI_END_REQUEST) {
         printf("\n\nResponse complete. FCGI_END_REQUEST\n\n");
-        return 1;
+        return true;
       }
     }
 
     if (beg_buf == end_buf)
-      return -1;
+      return false;
   }
 }
 
-int
+bool
 FCGIClientRequest::fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::ostringstream &output)
 {
   if (first_chunk) {
