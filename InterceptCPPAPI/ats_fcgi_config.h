@@ -33,14 +33,14 @@ typedef struct {
   FCGIParams *param;
   // TSMgmtString root_directory;
   // int required_hostname_len;
-} fcgiPluginConfig;
+} FCGIPluginConfig;
 
 typedef struct {
   UintMap *active_hash_map;
   TSMutex mutex;
   uint64_t seq_id;
   int txn_slot;
-  fcgiPluginConfig *global_config;
+  FCGIPluginConfig *global_config;
   UsecList *keep_pass_list;
   TSHRTime last_gc_time;
   bool read_while_writer;
@@ -53,9 +53,9 @@ typedef struct {
   int cur_keep_pass_entries;
   int max_hash_entries;
   int max_keep_pass_entries;
-} fcgiPluginData;
+} InterceptPluginData;
 
-fcgiPluginConfig *initConfig(const char *fn);
-fcgiPluginData *getFCGIPlugin();
+FCGIPluginConfig *initConfig(const char *fn);
+InterceptPluginData *getFCGIPlugin();
 
 #endif /*ATS_FCGI_CONFIG_H*/

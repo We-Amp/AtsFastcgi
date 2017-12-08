@@ -1,5 +1,5 @@
 #include "ats_fcgi_client.h"
-#include "ats_mod_fcgi.h"
+#include "ats_mod_intercept.h"
 #include "fcgi_protocol.h"
 #include "ts/ink_defs.h"
 #include <iostream>

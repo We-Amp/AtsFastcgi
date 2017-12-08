@@ -1,3 +1,6 @@
+
+#include "ats_mod_intercept.h"
+
 #include <atscppapi/GlobalPlugin.h>
 #include <atscppapi/InterceptPlugin.h>
 #include <atscppapi/Logger.h>
@@ -6,14 +9,13 @@
 #include <netinet/in.h>
 #include <string.h>
 
-#include "ats_fcgi_config.h"
-#include "ats_mod_fcgi.h"
-#include "fcgi_intercept.h"
 #include "ts/ink_defs.h"
 #include "ts/ts.h"
 #include "utils_internal.h"
 
-#include "fcgi_server.h"
+#include "ats_fcgi_config.h"
+#include "server_intercept.h"
+#include "server.h"
 
 using namespace atscppapi;
 
@@ -28,25 +30,26 @@ using std::string;
  * and will provide detailed information about the logging site such as
  * filename, function name, and line number of the message
  */
-namespace fcgiGlobal
+namespace InterceptGlobal
 {
 GlobalPlugin *plugin;
-fcgiPluginData *plugin_data;
-FCGIServer *fcgi_server;
+InterceptPluginData *plugin_data;
+Server *gServer;
 }
-using namespace fcgiGlobal;
 
-class FastCGIGlobalPlugin : public GlobalPlugin
+using namespace InterceptGlobal;
+
+class InterceptGlobalPlugin : public GlobalPlugin
 {
 public:
-  FastCGIGlobalPlugin() : GlobalPlugin(true) { GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS); }
+  InterceptGlobalPlugin() : GlobalPlugin(true) { GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS); }
   void
   handleReadRequestHeaders(Transaction &transaction) override
   {
     if (transaction.getClientRequest().getUrl().getPath().find(".php") != string::npos) {
-      auto intercept = new FastCGIIntercept(transaction);
+      auto intercept = new ServerIntercept(transaction);
       transaction.addPlugin(intercept);
-      fcgi_server->connect(intercept);
+      gServer->connect(intercept);
     }
     transaction.resume();
   }
@@ -66,11 +69,11 @@ TSPluginInit(int argc, const char *argv[])
   }
 
   if (plugin_data->global_config->enabled) {
-    plugin = new FastCGIGlobalPlugin();
+    plugin = new InterceptGlobalPlugin();
     TSDebug(PLUGIN_NAME, " plugin loaded into ATS. Transaction_slot = %d", plugin_data->txn_slot);
   } else {
     TSDebug(PLUGIN_NAME, " plugin is disabled.");
   }
 
-  fcgi_server = new FCGIServer();
+  gServer = new Server();
 }
