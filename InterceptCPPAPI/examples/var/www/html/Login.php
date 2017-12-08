@@ -1,5 +1,7 @@
 <html>
-<head></head>
+<head>
+<link type="text/css" rel="stylesheet" href="/styles/main.css" />
+</head>
 <body>
  <form method="POST" action="postData.php">
    <textarea name="data">

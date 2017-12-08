@@ -20,8 +20,9 @@ class FCGIServer;
 namespace fcgiGlobal
 {
 extern GlobalPlugin *plugin;
-extern fcgiPluginData *plugin_data;
+extern atsfcgiconfig::FcgiPluginData *plugin_data;
 extern FCGIServer *fcgi_server;
+extern int reqId, respId;
 }
 
 /*
