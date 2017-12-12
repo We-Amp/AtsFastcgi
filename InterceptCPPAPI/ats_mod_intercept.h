@@ -1,7 +1,6 @@
-#ifndef ATS_MOD_FCGI_H
-#define ATS_MOD_FCGI_H
+#ifndef ATS_MOD_INTERCEPT_H
+#define ATS_MOD_INTERCEPT_H
 
-#define PLUGIN_NAME "ats_mod_fcgi"
 #define PLUGIN_VENDOR "Apache Software Foundation"
 #define PLUGIN_SUPPORT "dev@trafficserver.apache.org"
 
@@ -11,17 +10,19 @@
 
 #include "ats_fcgi_config.h"
 #include <atscppapi/GlobalPlugin.h>
-#include "fcgi_server.h"
+#include "server.h"
 
 using namespace atscppapi;
 
 class FCGIServer;
 
-namespace fcgiGlobal
+namespace InterceptGlobal
 {
 extern GlobalPlugin *plugin;
-extern fcgiPluginData *plugin_data;
-extern FCGIServer *fcgi_server;
+extern InterceptPluginData *plugin_data;
+
+// TODO (Rakesh): Move to FCGI connect file
+extern ats_plugin::Server *gServer;
 }
 
 /*
@@ -30,4 +31,4 @@ extern FCGIServer *fcgi_server;
  */
 #define ATS_FCGI_DEFAULT_IDLE_TIMEOUT 30
 
-#endif /* ATS_MOD_FCGI_H */
+#endif /* ATS_MOD_INTERCEPT_H */

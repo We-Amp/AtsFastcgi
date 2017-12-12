@@ -1,5 +1,5 @@
 #include "ats_fcgi_client.h"
-#include "ats_mod_fcgi.h"
+#include "ats_mod_intercept.h"
 #include "fcgi_protocol.h"
 #include "ts/ink_defs.h"
 #include <iostream>
@@ -13,10 +13,10 @@
 #include <atscppapi/utils.h>
 
 using namespace atscppapi;
-using namespace FCGIClient;
+using namespace ats_plugin;
 using namespace std;
 
-struct FCGIClient::FCGIClientState {
+struct ats_plugin::FCGIClientState {
   FCGI_BeginRequest *request;
   FCGI_Header *header, *postHeader;
   unsigned char *buff, *pBuffInc;

@@ -26,7 +26,7 @@ typedef unsigned char uchar;
 #define FCGI_PROCESS_DONE 2
 #define FCGI_PROCESS_ERR 3
 
-namespace FCGIClient
+namespace ats_plugin
 {
 using namespace atscppapi;
 

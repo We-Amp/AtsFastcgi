@@ -6,9 +6,6 @@
 #include "ats_fcgi_config.h"
 #include <ts/ts.h>
 
-#include "ats_mod_fcgi.h"
-using namespace fcgiGlobal;
-
 static char DEFAULT_HOSTNAME[]     = "localhost";
 static char DEFAULT_SERVER_IP[]    = "127.0.0.1";
 static char DEFAULT_SERVER_PORT[]  = "60000";
@@ -97,13 +94,13 @@ fcgiHttpTxnConfigFind(const char *name, int length, fcgiConfigKey *conf, TSRecor
  *
  * @param const char *fn filename of config file
  *
- * @return fcgiPluginConfig *config object
+ * @return FCGIPluginConfig *config object
  */
-fcgiPluginConfig *
+FCGIPluginConfig *
 initConfig(const char *fn)
 {
-  fcgiPluginData *plugin_data = getFCGIPlugin();
-  fcgiPluginConfig *config    = static_cast<fcgiPluginConfig *>(TSmalloc(sizeof(fcgiPluginConfig)));
+  InterceptPluginData *plugin_data = getFCGIPlugin();
+  FCGIPluginConfig *config         = static_cast<FCGIPluginConfig *>(TSmalloc(sizeof(FCGIPluginConfig)));
 
   // Default config
   if (nullptr == plugin_data || nullptr == plugin_data->global_config) {
@@ -114,7 +111,7 @@ initConfig(const char *fn)
     config->include     = DEFAULT_INCLUDE_FILE;
   } else {
     // Inherit from global config
-    fcgiPluginConfig *global_config = plugin_data->global_config;
+    FCGIPluginConfig *global_config = plugin_data->global_config;
     config->enabled                 = global_config->enabled;
     config->hostname                = TSstrdup(global_config->hostname);
     config->server_ip               = TSstrdup(global_config->server_ip);
@@ -274,15 +271,15 @@ initConfig(const char *fn)
   return config;
 }
 
-fcgiPluginData *
+InterceptPluginData *
 getFCGIPlugin()
 {
-  static fcgiPluginData *data = nullptr;
+  static InterceptPluginData *data = nullptr;
 
   // TODO Check where this data is released/freed
 
   if (!data) {
-    data                  = static_cast<fcgiPluginData *>(TSmalloc(sizeof(fcgiPluginData)));
+    data                  = static_cast<InterceptPluginData *>(TSmalloc(sizeof(InterceptPluginData)));
     data->mutex           = TSMutexCreate();
     data->active_hash_map = new UintMap();
     data->keep_pass_list  = new UsecList();
