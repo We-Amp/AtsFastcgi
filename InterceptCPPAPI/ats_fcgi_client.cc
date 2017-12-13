@@ -306,9 +306,8 @@ FCGIClientRequest::fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len)
 uint32_t
 FCGIClientRequest::fcgiHeaderGetContentLen(FCGI_Header *h)
 {
-  printf("\ncontentLengthB1: %d ,contentLengthB0 : %d ,After shieft "
-         "content_len_hi: %d",
-         h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
+  TSDebug(PLUGIN_NAME, "[%s ] contentLengthB1: %d ,contentLengthB0 : %d ,After shieft content_len_hi: %d ", __FUNCTION__,
+          h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
   return (h->contentLengthB1 << 8) + h->contentLengthB0;
 }
 
@@ -443,10 +442,10 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
     if (fcgiProcessRecord(&beg_buf, end_buf, _headerRecord) == FCGI_PROCESS_DONE) {
       if (_headerRecord->header->type == FCGI_STDOUT) {
         output << std::string((const char *)_headerRecord->content, _headerRecord->length);
-        printf("\n\nwriting to stdout stream\n\n");
+        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] writing to stdout stream.", __FUNCTION__);
       }
       if (_headerRecord->header->type == FCGI_END_REQUEST) {
-        printf("\n\nResponse complete. FCGI_END_REQUEST\n\n");
+        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response complete. FCGI_END_REQUEST.*****\n\n", __FUNCTION__);
         return true;
       }
     }

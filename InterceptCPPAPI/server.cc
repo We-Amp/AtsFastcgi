@@ -31,7 +31,7 @@ interceptTransferData(ServerIntercept *intercept, ServerConnection *server_conn)
   }
 
   if (consumed) {
-    cout << "InterceptTransferData: Read " << consumed << " Bytes from server and writing it to client side" << endl;
+    TSDebug(PLUGIN_NAME, "[%s] Read %ld bytes from server and writing it to client side.", __FUNCTION__, consumed);
     TSIOBufferReaderConsume(server_conn->readio.reader, consumed);
   }
   TSVIONDoneSet(server_conn->readio.vio, TSVIONDoneGet(server_conn->readio.vio) + consumed);
