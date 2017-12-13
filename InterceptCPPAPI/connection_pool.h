@@ -23,6 +23,7 @@ public:
   ServerConnection *getAvailableConnection();
   void addConnection(ServerConnection *);
   void setupNewConnection();
+  int checkAvailability();
 
 private:
   void createConnections();

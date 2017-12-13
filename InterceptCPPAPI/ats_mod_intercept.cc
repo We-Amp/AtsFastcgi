@@ -48,10 +48,18 @@ public:
   {
     if (transaction.getClientRequest().getUrl().getPath().find(".php") != string::npos) {
       auto intercept = new ats_plugin::ServerIntercept(transaction);
-      transaction.addPlugin(intercept);
-      gServer->connect(intercept);
+
+      int size = gServer->checkAvailability();
+      TSDebug(PLUGIN_NAME, "[%s] availability : %d", __FUNCTION__, size);
+      if (size) {
+        transaction.addPlugin(intercept);
+        gServer->connect(intercept);
+        transaction.resume();
+      } else {
+        TSDebug(PLUGIN_NAME, "[%s] Adding to pending list. QueueLength: %lu", __FUNCTION__, gServer->pending_list.size());
+        gServer->pending_list.push(intercept);
+      }
     }
-    transaction.resume();
   }
 };
 

@@ -3,7 +3,7 @@
 
 #include "server_intercept.h"
 #include <map>
-
+#include <queue>
 namespace ats_plugin
 {
 class ServerIntercept;
@@ -55,11 +55,14 @@ public:
   Server(Server const &) = delete;
   void operator=(Server const &) = delete;
 
+  int checkAvailability();
+  std::queue<ServerIntercept *> pending_list;
+
 private:
   void createConnections();
 
   std::map<uint, std::tuple<ServerIntercept *, ServerConnection *>> _intercept_list;
-  std::list<ServerIntercept *> pending_list;
+
   ConnectionPool *_connection_pool;
 };
 }

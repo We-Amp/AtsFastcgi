@@ -22,11 +22,14 @@ InterceptIOChannel::~InterceptIOChannel()
 void
 InterceptIOChannel::read(TSVConn vc, TSCont contp)
 {
-  TSReleaseAssert(this->vio == nullptr);
-  TSReleaseAssert((this->iobuf = TSIOBufferCreate()));
-  TSReleaseAssert((this->reader = TSIOBufferReaderAlloc(this->iobuf)));
-  if (this->reader != nullptr) {
-    this->vio = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
+  // TSReleaseAssert(this->vio == nullptr);
+  // TSReleaseAssert((this->iobuf = TSIOBufferCreate()));
+  // TSReleaseAssert((this->reader = TSIOBufferReaderAlloc(this->iobuf)));
+
+  if (!this->iobuf) {
+    this->iobuf  = TSIOBufferCreate();
+    this->reader = TSIOBufferReaderAlloc(this->iobuf);
+    this->vio    = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
     if (this->vio == nullptr) {
       TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
     }
@@ -50,9 +53,9 @@ InterceptIOChannel::write(TSVConn vc, TSCont contp)
 }
 
 void
-InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size)
+InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size, bool endflag)
 {
-  if (TSVConnClosedGet(contp)) {
+  if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
   if (!this->iobuf) {
@@ -71,11 +74,20 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
   }
   total_bytes_written += data_size;
   // TSDebug(PLUGIN_NAME, "writeio.vio :%p, Wrote %d bytes on PHP side", this->vio,total_bytes_written);
-  //  TSVIOReenable(this->vio);
+  if (!endflag) {
+    TSVIOReenable(this->vio);
+  }
 }
 
 ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
-  : _state(INITIATED), _server(server), _funcp(funcp), _requestId(0)
+  : vc_(nullptr),
+    _fcgiRequest(nullptr),
+    _state(INITIATED),
+    _server(server),
+    _funcp(funcp),
+    _contp(nullptr),
+    _sConnInfo(nullptr),
+    _requestId(0)
 {
   createConnection();
 }

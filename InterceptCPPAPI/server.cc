@@ -79,7 +79,8 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     responseStatus             = interceptTransferData(intercept, server_connection);
 
     if (responseStatus == true) {
-      TSDebug(PLUGIN_NAME, "[%s]: ResponseComplete...Sending Response to client stream.", __FUNCTION__);
+      TSDebug(PLUGIN_NAME, "[%s]: ResponseComplete...Sending Response to client stream. _request_id: %d", __FUNCTION__,
+              server_connection->requestId());
       intercept->setResponseOutputComplete();
       server_connection->setState(ServerConnection::CLOSED);
     }
@@ -170,7 +171,29 @@ Server::removeIntercept(uint request_id)
     // ServerIntercept *intercept = std::get<0>(itr->second);
     ServerConnection *serv_conn = std::get<1>(itr->second);
     _intercept_list.erase(itr);
-    delete serv_conn;
+
+    TSDebug(PLUGIN_NAME, "Reset  server Connection Obj");
+    serv_conn->setRequestId(0);
+    TSDebug(PLUGIN_NAME, "[Server:%s] Adding connection back to connection pool. QueueLength:%lu", __FUNCTION__,
+            pending_list.size());
+    serv_conn->setState(ServerConnection::READY);
+    _connection_pool->addConnection(serv_conn);
+    if (!pending_list.empty()) {
+      int size = _connection_pool->checkAvailability();
+      TSDebug(PLUGIN_NAME, "[Server:%s] Connection Pool Available Size:%d", __FUNCTION__, size);
+      if (size) {
+        TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
+        ServerIntercept *intercept = pending_list.front();
+        pending_list.pop();
+        Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+        transaction.addPlugin(intercept);
+        server()->connect(intercept);
+        transaction.resume();
+      } else {
+        TSDebug(PLUGIN_NAME, "[Server:%s] Connection Not available. QueueSize: %lu", __FUNCTION__, pending_list.size());
+      }
+    }
+    // delete serv_conn;
   }
 
   // RequestIntercept *req_intercept = (RequestIntercept *)TSContDataGet(contp);
@@ -189,7 +212,8 @@ Server::writeRequestHeader(uint request_id)
   fcgiRequest->createBeginRequest();
   clientReq = fcgiRequest->addClientRequest(reqLen);
   // server_conn->setState(ServerConnection::WRITE);
-  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen);
+  bool endflag = false;
+  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
 }
 
 void
@@ -203,8 +227,9 @@ Server::writeRequestBody(uint request_id, const string &data)
   int reqLen            = 0;
   fcgiRequest->postData = data;
   fcgiRequest->postBodyChunk();
-  clientReq = fcgiRequest->addClientRequest(reqLen);
-  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen);
+  clientReq    = fcgiRequest->addClientRequest(reqLen);
+  bool endflag = false;
+  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
 }
 
 void
@@ -217,8 +242,9 @@ Server::writeRequestBodyComplete(uint request_id)
   unsigned char *clientReq;
   int reqLen = 0;
   fcgiRequest->emptyParam();
-  clientReq = fcgiRequest->addClientRequest(reqLen);
-  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen);
+  clientReq    = fcgiRequest->addClientRequest(reqLen);
+  bool endflag = true;
+  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
   // server_conn->setState(ServerConnection::WRITE_COMPLETE);
   // TSContCall(TSVIOContGet(server_conn->writeio.vio), TS_EVENT_VCONN_WRITE_COMPLETE, server_conn->writeio.vio);
   server_conn->readio.read(server_conn->vc_, server_conn->contp());
@@ -233,27 +259,54 @@ Server::connect(ServerIntercept *intercept)
 
   ServerConnection *conn = _connection_pool->getAvailableConnection();
 
-  if (conn) {
-    TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...", __FUNCTION__);
-    conn->setRequestId(request_id);
+  TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);
+  conn->setRequestId(request_id);
 
-    // TODO: Check better way to do it
-    _intercept_list[request_id] = std::make_tuple(intercept, conn);
-    conn->createFCGIClient(intercept->_txn);
-
-  } else {
-    TSDebug(PLUGIN_NAME, "[Server:%s]: Adding to pending list.", __FUNCTION__);
-    // TODO: put in pending list
-    _connection_pool->setupNewConnection();
-    ServerConnection *conn = _connection_pool->getAvailableConnection();
-    conn->setRequestId(request_id);
-    _intercept_list[request_id] = std::make_tuple(intercept, conn);
-    conn->createFCGIClient(intercept->_txn);
-  }
+  // TODO: Check better way to do it
+  _intercept_list[request_id] = std::make_tuple(intercept, conn);
+  conn->setState(ServerConnection::INUSE);
+  conn->createFCGIClient(intercept->_txn);
 
   return request_id;
 }
 
+// const uint
+// Server::connect(ServerIntercept *intercept)
+// {
+//   const uint request_id = UniqueRequesID::getNext();
+
+//   intercept->setRequestId(request_id);
+
+//   ServerConnection *conn = _connection_pool->getAvailableConnection();
+
+//   if (conn) {
+//     TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);
+//     conn->setRequestId(request_id);
+
+//     // TODO: Check better way to do it
+//     _intercept_list[request_id] = std::make_tuple(intercept, conn);
+//     conn->createFCGIClient(intercept->_txn);
+
+//   } else {
+//     TSDebug(PLUGIN_NAME, "[Server:%s]: Adding to pending list.", __FUNCTION__);
+//     // TODO: put in pending list
+//     pending_list.push(intercept);
+//     // _connection_pool->setupNewConnection();
+//     // ServerConnection *conn = _connection_pool->getAvailableConnection();
+//     // conn->setRequestId(request_id);
+//     // _intercept_list[request_id] = std::make_tuple(intercept, conn);
+//     // conn->createFCGIClient(intercept->_txn);
+//   }
+
+//   return request_id;
+// }
+
+int
+Server::checkAvailability()
+{
+  int size = _connection_pool->checkAvailability();
+  return size;
+}
 void
 Server::createConnections()
 {

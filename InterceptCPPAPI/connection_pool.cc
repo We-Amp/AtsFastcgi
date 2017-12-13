@@ -17,6 +17,11 @@ ConnectionPool::~ConnectionPool()
   TSDebug(PLUGIN_NAME, "Destroying connectionPool Obj...");
 }
 
+int
+ConnectionPool::checkAvailability()
+{
+  return _available_connections.size();
+}
 ServerConnection *
 ConnectionPool::getAvailableConnection()
 {
@@ -27,10 +32,10 @@ ConnectionPool::getAvailableConnection()
   ServerConnection *conn = nullptr;
   for (auto itr = _available_connections.begin(); itr != _available_connections.end(); itr++) {
     conn = *itr;
-    // if (conn->getState() == ServerConnection::READY) {
-    _available_connections.remove(conn);
-    return conn;
-    //}
+    if (conn->getState() == ServerConnection::READY) {
+      _available_connections.remove(conn);
+      return conn;
+    }
   }
 
   return conn;
@@ -55,7 +60,7 @@ ConnectionPool::createConnections()
   int i = 0;
   ServerConnection *sConn;
   // TODO: Read config and available connections and servers and create the connections accordingly
-  while (i < 10) {
+  while (i < 5) {
     sConn = new ServerConnection(_server, _funcp);
     addConnection(sConn);
     i++;

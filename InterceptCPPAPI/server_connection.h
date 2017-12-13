@@ -21,7 +21,7 @@ struct InterceptIOChannel {
 
   void read(TSVConn vc, TSCont contp);
   void write(TSVConn vc, TSCont contp);
-  void phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size);
+  void phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size, bool endflag);
 };
 
 class ServerConnection
@@ -30,7 +30,7 @@ public:
   ServerConnection(Server *server, TSEventFunc funcp);
   ~ServerConnection();
 
-  enum State { INITIATED, READY, WRITE, WRITE_COMPLETE, READ, READ_COMPLETE, CLOSED };
+  enum State { INITIATED, READY, INUSE, CLOSED };
 
   void
   setState(State state)
