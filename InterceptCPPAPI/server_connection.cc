@@ -73,7 +73,7 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
     TSVIOReenable(this->vio);
   } else {
     this->readEnable = true;
-    TSDebug(PLUGIN_NAME, "[%s] Done: %d \tnBytes: %d", __FUNCTION__, TSVIONDoneGet(this->vio), TSVIONBytesGet(this->vio));
+    TSDebug(PLUGIN_NAME, "[%s] Done: %ld \tnBytes: %ld", __FUNCTION__, TSVIONDoneGet(this->vio), TSVIONBytesGet(this->vio));
   }
 }
 
