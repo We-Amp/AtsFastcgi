@@ -16,7 +16,7 @@
 #include <atscppapi/utils.h>
 
 #include "ats_fcgi_client.h"
-#include "ats_fcgi_config.h"
+#include "fcgi_config.h"
 #include "server.h"
 
 using namespace atscppapi;

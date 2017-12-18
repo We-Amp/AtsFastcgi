@@ -83,23 +83,20 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
               server_connection->requestId());
       intercept->setResponseOutputComplete();
       server_connection->setState(ServerConnection::CLOSED);
+      TSStatIntIncrement(InterceptGlobal::respId, 1);
     }
     break;
   }
 
   case TS_EVENT_VCONN_WRITE_READY: {
-    TSDebug(PLUGIN_NAME, "[%s]: Write Ready.WriteIO.vio. Wrote : %ld bytes. vc_ : %p", __FUNCTION__,
-            TSVIONDoneGet(server_connection->writeio.vio), server_connection->vc_);
-
-    // if(server_connection->getState()==ServerConnection::WRITE_COMPLETE){
-    //   TSContCall(TSVIOContGet(server_connection->writeio.vio), TS_EVENT_VCONN_WRITE_COMPLETE, server_connection->writeio.vio);
-    // }
+    if (server_connection->writeio.readEnable) {
+      TSContCall(TSVIOContGet(server_connection->writeio.vio), TS_EVENT_VCONN_WRITE_COMPLETE, server_connection->writeio.vio);
+    }
 
   } break;
   case TS_EVENT_VCONN_WRITE_COMPLETE: {
     TSDebug(PLUGIN_NAME, "[%s]: Start Reading from Server now...", __FUNCTION__);
-    // server_connection->setState(ServerConnection::READ);
-    // server_connection->readio.read(server_connection->vc_, server_connection->contp());
+    server_connection->readio.read(server_connection->vc_, server_connection->contp());
   } break;
   case TS_EVENT_VCONN_READ_COMPLETE: {
     TSDebug(PLUGIN_NAME, "[%s]: Server Read Complete...", __FUNCTION__);
@@ -107,14 +104,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   } break;
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "[%s]: EOS reached.", __FUNCTION__);
-    bool responseStatus        = false;
-    ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
-    interceptTransferData(intercept, server_connection);
-    if (responseStatus == true) {
-      TSDebug(PLUGIN_NAME, "[%s]: EOS => Sending Response to client side", __FUNCTION__);
-      intercept->setResponseOutputComplete();
-    }
-
   } break;
   case TS_EVENT_ERROR: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Connection Disconnected...Error...");
@@ -195,9 +184,6 @@ Server::removeIntercept(uint request_id)
     }
     // delete serv_conn;
   }
-
-  // RequestIntercept *req_intercept = (RequestIntercept *)TSContDataGet(contp);
-  // delete req_intercept;
 }
 
 void
@@ -245,9 +231,8 @@ Server::writeRequestBodyComplete(uint request_id)
   clientReq    = fcgiRequest->addClientRequest(reqLen);
   bool endflag = true;
   server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
-  // server_conn->setState(ServerConnection::WRITE_COMPLETE);
-  // TSContCall(TSVIOContGet(server_conn->writeio.vio), TS_EVENT_VCONN_WRITE_COMPLETE, server_conn->writeio.vio);
-  server_conn->readio.read(server_conn->vc_, server_conn->contp());
+
+  // server_conn->readio.read(server_conn->vc_, server_conn->contp());
 }
 
 const uint
@@ -264,7 +249,7 @@ Server::connect(ServerIntercept *intercept)
 
   // TODO: Check better way to do it
   _intercept_list[request_id] = std::make_tuple(intercept, conn);
-  conn->setState(ServerConnection::INUSE);
+  // conn->setState(ServerConnection::INUSE);
   conn->createFCGIClient(intercept->_txn);
 
   return request_id;

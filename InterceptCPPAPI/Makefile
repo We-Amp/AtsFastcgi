@@ -16,7 +16,7 @@ TRAFFIC_SERVER_SRC_DIR=$(ATS_SRC)
 TRAFFIC_SERVER_EXEC_DIR=$(ATS_EXEC)
 
 TSXS?=$(TRAFFIC_SERVER_EXEC_DIR)/bin/tsxs
-OBJ_FILES=server_intercept.cc ats_fcgi_config.cc ats_fcgi_client.cc server.cc connection_pool.cc server_connection.cc
+OBJ_FILES=server_intercept.cc fcgi_config.cc ats_fcgi_client.cc server.cc connection_pool.cc server_connection.cc
 
 TRAFFIC_SERVER_EXEC_CONF_DIR=$(TRAFFIC_SERVER_EXEC_DIR)/etc/trafficserver/
 PLUGIN_CONF_FILES=$(MOD_FCGI_DIR)/config/ats_mod_fcgi.config

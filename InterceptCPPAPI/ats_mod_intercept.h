@@ -8,7 +8,7 @@
 #define ATS_MOD_FCGI_VERSION "ats_mod_fcgi"
 #define ATS_MOD_LOG_FILENAME "atsModFCGI.log"
 
-#include "ats_fcgi_config.h"
+#include "fcgi_config.h"
 #include <atscppapi/GlobalPlugin.h>
 #include "server.h"
 
@@ -19,10 +19,10 @@ class FCGIServer;
 namespace InterceptGlobal
 {
 extern GlobalPlugin *plugin;
-extern InterceptPluginData *plugin_data;
-
+extern ats_plugin::InterceptPluginData *plugin_data;
 // TODO (Rakesh): Move to FCGI connect file
 extern ats_plugin::Server *gServer;
+extern int reqId, respId;
 }
 
 /*

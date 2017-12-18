@@ -4,6 +4,7 @@
 #include "server.h"
 #include "server_connection.h"
 
+#include "ats_mod_intercept.h"
 #include "ts/ts.h"
 
 using namespace ats_plugin;
@@ -60,7 +61,12 @@ ConnectionPool::createConnections()
   int i = 0;
   ServerConnection *sConn;
   // TODO: Read config and available connections and servers and create the connections accordingly
-  while (i < 5) {
+  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
+  int maxConn                           = gConfig->getMaxConnLength();
+  // int minConn                           = gConfig->getMinConnLength();
+  // int reqQueueLen                       = gConfig->getRequestQueueSize();
+
+  while (i < maxConn) {
     sConn = new ServerConnection(_server, _funcp);
     addConnection(sConn);
     i++;

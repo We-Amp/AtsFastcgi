@@ -4,7 +4,7 @@
 #include "ats_fcgi_client.h"
 #include "ats_mod_intercept.h"
 using namespace ats_plugin;
-InterceptIOChannel::InterceptIOChannel() : vio(nullptr), iobuf(nullptr), reader(nullptr), total_bytes_written(0)
+InterceptIOChannel::InterceptIOChannel() : vio(nullptr), iobuf(nullptr), reader(nullptr), total_bytes_written(0), readEnable(false)
 {
 }
 InterceptIOChannel::~InterceptIOChannel()
@@ -22,21 +22,16 @@ InterceptIOChannel::~InterceptIOChannel()
 void
 InterceptIOChannel::read(TSVConn vc, TSCont contp)
 {
-  // TSReleaseAssert(this->vio == nullptr);
-  // TSReleaseAssert((this->iobuf = TSIOBufferCreate()));
-  // TSReleaseAssert((this->reader = TSIOBufferReaderAlloc(this->iobuf)));
-
-  if (!this->iobuf) {
-    this->iobuf  = TSIOBufferCreate();
-    this->reader = TSIOBufferReaderAlloc(this->iobuf);
-    this->vio    = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
-    if (this->vio == nullptr) {
-      TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
-    }
-    TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
-  } else {
-    TSError(" Error in Allocating a Reader to output buffer. TSIOBufferReaderAlloc returns NULL");
+  if (TSVConnClosedGet(vc)) {
+    TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
+  this->iobuf  = TSIOBufferCreate();
+  this->reader = TSIOBufferReaderAlloc(this->iobuf);
+  this->vio    = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
+  if (this->vio == nullptr) {
+    TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
+  }
+  TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
 }
 
 void
@@ -63,7 +58,7 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
     this->reader = TSIOBufferReaderAlloc(this->iobuf);
     this->vio    = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
     if (this->vio == nullptr) {
-      TSError("[InterceptIOChannel:%s] Error while writing data on server stream", __FUNCTION__);
+      TSError("[InterceptIOChannel:%s] Error TSVIO returns null. ", __FUNCTION__);
     }
   }
   int num_bytes_written = TSIOBufferWrite(this->iobuf, (const void *)buf, data_size);
@@ -73,9 +68,12 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
             PLUGIN_NAME, data_size, num_bytes_written);
   }
   total_bytes_written += data_size;
-  // TSDebug(PLUGIN_NAME, "writeio.vio :%p, Wrote %d bytes on PHP side", this->vio,total_bytes_written);
+  TSDebug(PLUGIN_NAME, "writeio.vio :%p, Wrote %d bytes on PHP side", this->vio, total_bytes_written);
   if (!endflag) {
     TSVIOReenable(this->vio);
+  } else {
+    this->readEnable = true;
+    TSDebug(PLUGIN_NAME, "[%s] Done: %d \tnBytes: %d", __FUNCTION__, TSVIONDoneGet(this->vio), TSVIONBytesGet(this->vio));
   }
 }
 
@@ -122,11 +120,10 @@ ServerConnection::createConnection()
   struct sockaddr_in ip_addr;
 
   unsigned short int a, b, c, d, p;
-  char *arr  = InterceptGlobal::plugin_data->global_config->server_ip;
-  char *port = InterceptGlobal::plugin_data->global_config->server_port;
+  char *arr  = InterceptGlobal::plugin_data->getGlobalConfigObj()->getServerIp();
+  char *port = InterceptGlobal::plugin_data->getGlobalConfigObj()->getServerPort();
   sscanf(arr, "%hu.%hu.%hu.%hu", &a, &b, &c, &d);
   sscanf(port, "%hu", &p);
-  // printf("%d %d %d %d : %d", a, b, c, d, p);
   int new_ip = (a << 24) | (b << 16) | (c << 8) | (d);
   memset(&ip_addr, 0, sizeof(ip_addr));
   ip_addr.sin_family      = AF_INET;

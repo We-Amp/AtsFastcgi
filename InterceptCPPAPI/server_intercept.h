@@ -2,7 +2,7 @@
 #define _SERVER_INTERCEPT_H_
 
 #include "ats_fcgi_client.h"
-#include "ats_fcgi_config.h"
+#include "fcgi_config.h"
 #include "atscppapi/Transaction.h"
 #include "atscppapi/TransactionPlugin.h"
 #include "ts/ink_defs.h"

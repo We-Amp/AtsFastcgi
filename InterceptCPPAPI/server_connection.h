@@ -15,7 +15,7 @@ struct InterceptIOChannel {
   TSIOBuffer iobuf;
   TSIOBufferReader reader;
   int total_bytes_written;
-
+  bool readEnable;
   InterceptIOChannel();
   ~InterceptIOChannel();
 
