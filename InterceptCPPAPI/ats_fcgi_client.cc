@@ -1,5 +1,5 @@
 #include "ats_fcgi_client.h"
-#include "ats_mod_fcgi.h"
+#include "ats_mod_intercept.h"
 #include "fcgi_protocol.h"
 #include "ts/ink_defs.h"
 #include <iostream>
@@ -13,10 +13,10 @@
 #include <atscppapi/utils.h>
 
 using namespace atscppapi;
-using namespace FCGIClient;
+using namespace ats_plugin;
 using namespace std;
 
-struct FCGIClient::FCGIClientState {
+struct ats_plugin::FCGIClientState {
   FCGI_BeginRequest *request;
   FCGI_Header *header, *postHeader;
   unsigned char *buff, *pBuffInc;
@@ -101,26 +101,40 @@ FCGIClientRequest::GenerateFcgiRequestHeaders()
 {
   map<string, string> fcgiReqHeader;
   Transaction &transaction = utils::internal::getTransaction(state_->txn_);
-  // Retriving headers inside local Headers to build  request as per config
-  // later
-
-  fcgiReqHeader["SCRIPT_FILENAME"]   = "/var/www/html/" + transaction.getClientRequest().getUrl().getPath();
+  Headers &h               = transaction.getClientRequest().getHeaders();
+  if (h.isInitialized()) {
+    cout << "Header Count: " << h.size() << endl;
+    // string key("Content-Length");
+    atscppapi::header_field_iterator it = h.begin();
+    for (it = h.begin(); it != h.end(); ++it) {
+      atscppapi::HeaderField hf(*it);
+      // cout << hf.name() << " => " << hf.values() << endl;
+      // fcgiReqHeader[hf.name()] = hf.values();
+    }
+  }
+  fcgiReqHeader["DOCUMET_ROOT"]      = InterceptGlobal::plugin_data->getGlobalConfigObj()->getDocumentRootDir();
+  fcgiReqHeader["SCRIPT_FILENAME"]   = fcgiReqHeader["DOCUMET_ROOT"] + transaction.getClientRequest().getUrl().getPath();
   fcgiReqHeader["GATEWAY_INTERFACE"] = "FastCGI/1.1";
   fcgiReqHeader["REQUEST_METHOD"]    = HTTP_METHOD_STRINGS[transaction.getClientRequest().getMethod()];
+  fcgiReqHeader["SCRIPT_NAME"]       = transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["QUERY_STRING"]      = transaction.getClientRequest().getUrl().getQuery();
+  fcgiReqHeader["REQUEST_URI"]       = transaction.getClientRequest().getUrl().getPath();
 
-  fcgiReqHeader["SCRIPT_NAME"]     = transaction.getClientRequest().getUrl().getPath();
-  fcgiReqHeader["QUERY_STRING"]    = transaction.getClientRequest().getUrl().getQuery();
-  fcgiReqHeader["REQUEST_URI"]     = transaction.getClientRequest().getUrl().getPath();
-  fcgiReqHeader["DOCUMET_ROOT"]    = "/";
-  fcgiReqHeader["SERVER_SOFTWARE"] = "ATS 7.1.1";
-  fcgiReqHeader["REMOTE_ADDR"]     = "127.0.0.1";
-  fcgiReqHeader["REMOTE_PORT"]     = "";
-  fcgiReqHeader["SERVER_ADDR"]     = "127.0.0.1";
-  fcgiReqHeader["SERVER_PORT"]     = "60000";
-  fcgiReqHeader["SERVER_NAME"]     = "SimpleServer";
+  // TODO map fcgiconfig with request headers.
+  // atsfcgiconfig::FCGIParams *params      = fcgiGlobal::plugin_data->getGlobalConfigObj()->getFcgiParams();
+  // atsfcgiconfig::FCGIParams::iterator it = params->begin();
+  // for (it = params->begin(); it != params->end(); ++it)
+  //   cout << it->first << " => " << it->second << endl;
+
+  // fcgiReqHeader["SERVER_SOFTWARE"]   = "ATS 7.1.1";
+  // fcgiReqHeader["REMOTE_ADDR"]       = "127.0.0.1";
+  // fcgiReqHeader["REMOTE_PORT"]       = "";
+  // fcgiReqHeader["SERVER_ADDR"]       = "127.0.0.1";
+  // fcgiReqHeader["SERVER_PORT"]       = "60000";
+  // fcgiReqHeader["SERVER_NAME"]       = "ATS 7.1.1";
   fcgiReqHeader["SERVER_PROTOCOL"] = "HTTP/1.1";
-  fcgiReqHeader["CONTENT_TYPE"]    = "application/x-www-form-urlencoded";
-  fcgiReqHeader["FCGI_ROLE"]       = "RESPONDER";
+  // fcgiReqHeader["CONTENT_TYPE"]      = "application/x-www-form-urlencoded";
+  fcgiReqHeader["FCGI_ROLE"] = "RESPONDER";
   return fcgiReqHeader;
 }
 
@@ -163,10 +177,10 @@ FCGIClientRequest::createBeginRequest()
 {
   state_->request = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
   // TODO send the request id here
-  state_->request->header       = createHeader(FCGI_BEGIN_REQUEST);
-  state_->request->body         = (FCGI_BeginRequestBody *)calloc(1, sizeof(FCGI_BeginRequestBody));
-  state_->request->body->roleB0 = FCGI_RESPONDER;
-
+  state_->request->header                  = createHeader(FCGI_BEGIN_REQUEST);
+  state_->request->body                    = (FCGI_BeginRequestBody *)calloc(1, sizeof(FCGI_BeginRequestBody));
+  state_->request->body->roleB0            = FCGI_RESPONDER;
+  state_->request->body->flags             = FCGI_KEEP_CONN;
   state_->request->header->contentLengthB0 = sizeof(FCGI_BeginRequestBody);
 
   // serialize request header
@@ -306,9 +320,8 @@ FCGIClientRequest::fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len)
 uint32_t
 FCGIClientRequest::fcgiHeaderGetContentLen(FCGI_Header *h)
 {
-  printf("\ncontentLengthB1: %d ,contentLengthB0 : %d ,After shieft "
-         "content_len_hi: %d",
-         h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
+  TSDebug(PLUGIN_NAME, "[%s ] contentLengthB1: %d ,contentLengthB0 : %d ,After shieft content_len_hi: %d ", __FUNCTION__,
+          h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
   return (h->contentLengthB1 << 8) + h->contentLengthB0;
 }
 
@@ -443,10 +456,17 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
     if (fcgiProcessRecord(&beg_buf, end_buf, _headerRecord) == FCGI_PROCESS_DONE) {
       if (_headerRecord->header->type == FCGI_STDOUT) {
         output << std::string((const char *)_headerRecord->content, _headerRecord->length);
-        printf("\n\nwriting to stdout stream\n\n");
+        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] writing to stdout stream.", __FUNCTION__);
+      }
+      // TODO: If FCGI gives error response, then this needs to address well.
+      // As of now, at the cppapi level library don't provide any api which will tell client that request
+      // has aborted or failed.
+      if (_headerRecord->header->type == FCGI_STDERR) {
+        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response FCGI_STDERR.*****\n\n", __FUNCTION__);
+        return true;
       }
       if (_headerRecord->header->type == FCGI_END_REQUEST) {
-        printf("\n\nResponse complete. FCGI_END_REQUEST\n\n");
+        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response complete. FCGI_END_REQUEST.*****\n\n", __FUNCTION__);
         return true;
       }
     }
