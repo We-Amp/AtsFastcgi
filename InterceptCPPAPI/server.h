@@ -48,6 +48,7 @@ public:
   ServerIntercept *getIntercept(uint request_id);
   void removeIntercept(uint request_id);
 
+  void dummyRequest(ServerConnection *srv_conn, uint request_id);
   void writeRequestHeader(uint request_id);
   void writeRequestBody(uint request_id, const std::string &data);
   void writeRequestBodyComplete(uint request_id);

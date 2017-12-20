@@ -39,6 +39,31 @@ struct ats_plugin::FCGIClientState {
   };
 };
 
+map<string, string>
+FCGIClientRequest::GenerateDummyFcgiRequestHeaders()
+{
+  map<string, string> fcgiReqHeader;
+
+  fcgiReqHeader["DOCUMET_ROOT"]      = InterceptGlobal::plugin_data->getGlobalConfigObj()->getDocumentRootDir();
+  fcgiReqHeader["SCRIPT_FILENAME"]   = fcgiReqHeader["DOCUMET_ROOT"];
+  fcgiReqHeader["GATEWAY_INTERFACE"] = "FastCGI/1.1";
+  fcgiReqHeader["REQUEST_METHOD"]    = "GET";
+  fcgiReqHeader["SERVER_PROTOCOL"]   = "HTTP/1.1";
+  fcgiReqHeader["FCGI_ROLE"]         = "RESPONDER";
+  return fcgiReqHeader;
+}
+
+FCGIClientRequest::FCGIClientRequest(int request_id)
+{
+  first_chunk            = true;
+  state_                 = new FCGIClientState();
+  _headerRecord          = nullptr;
+  state_->request_id_    = request_id;
+  state_->requestHeaders = GenerateDummyFcgiRequestHeaders();
+  state_->buff           = (unsigned char *)TSmalloc(BUF_SIZE);
+  state_->pBuffInc       = state_->buff;
+}
+
 // input to the constructor will be either unique transaction id or int type
 // requestId
 FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
@@ -172,6 +197,24 @@ FCGIClientRequest::createHeader(uchar type)
   return tmp;
 }
 
+FCGI_BeginRequest *
+FCGIClientRequest::createDummyBegin()
+{
+  state_->request                          = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
+  state_->request->header                  = createHeader(FCGI_BEGIN_REQUEST);
+  state_->request->body                    = (FCGI_BeginRequestBody *)calloc(1, sizeof(FCGI_BeginRequestBody));
+  state_->request->body->roleB0            = FCGI_RESPONDER;
+  state_->request->body->flags             = FCGI_KEEP_CONN;
+  state_->request->header->contentLengthB0 = sizeof(FCGI_BeginRequestBody);
+
+  // serialize request header
+  serialize(state_->pBuffInc, state_->request->header, sizeof(FCGI_Header));
+  state_->pBuffInc += sizeof(FCGI_Header);
+  serialize(state_->pBuffInc, state_->request->body, sizeof(FCGI_BeginRequestBody));
+  state_->pBuffInc += sizeof(FCGI_BeginRequestBody);
+  TSDebug(PLUGIN_NAME, "Header Len: %ld ", state_->pBuffInc - state_->buff);
+  return state_->request;
+}
 FCGI_BeginRequest *
 FCGIClientRequest::createBeginRequest()
 {
