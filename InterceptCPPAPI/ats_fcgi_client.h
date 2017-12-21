@@ -76,11 +76,6 @@ public:
   std::map<std::string, std::string> GenerateFcgiRequestHeaders();
   void printFCGIRequestHeaders();
 
-  // Dummy Request Creation
-  FCGIClientRequest(int request_id);
-  FCGI_BeginRequest *createDummyBegin();
-  std::map<std::string, std::string> GenerateDummyFcgiRequestHeaders();
-
   // Request Creation
   FCGI_BeginRequest *createBeginRequest();
   FCGI_Header *createHeader(unsigned char type);

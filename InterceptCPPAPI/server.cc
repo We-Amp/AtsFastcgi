@@ -58,9 +58,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_NET_CONNECT: {
     server_connection->vc_ = (TSVConn)edata;
 
-    const uint request_id = UniqueRequesID::getNext();
-    TSDebug(PLUGIN_NAME, "[%s] Dummy RequestId: %d", __FUNCTION__, request_id);
-    server->dummyRequest(server_connection, request_id);
     server_connection->setState(ServerConnection::READY);
 
     TSDebug(PLUGIN_NAME, "Connected to FCGI Server. vc_ : %p \t _contp: %p \tWriteIO.vio :%p \t ReadIO.vio :%p ",
@@ -188,21 +185,6 @@ Server::removeIntercept(uint request_id)
     }
     // delete serv_conn;
   }
-}
-void
-Server::dummyRequest(ServerConnection *server_conn, uint requestid)
-{
-  FCGIClientRequest *fcgiRequest = new FCGIClientRequest(requestid);
-  unsigned char *clientReq;
-  int reqLen = 0;
-
-  // TODO: possibly move all this as one function in server_connection
-  fcgiRequest->createDummyBegin();
-  // fcgiRequest->postBodyChunk();
-  fcgiRequest->emptyParam();
-  clientReq    = fcgiRequest->addClientRequest(reqLen);
-  bool endflag = true;
-  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
 }
 
 void
