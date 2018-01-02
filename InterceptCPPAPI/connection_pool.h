@@ -21,9 +21,12 @@ public:
   ~ConnectionPool();
 
   ServerConnection *getAvailableConnection();
-  void addConnection(ServerConnection *);
-  void setupNewConnection();
   int checkAvailability();
+
+  void addConnection(ServerConnection *);
+  void removeConnection(ServerConnection *);
+  void reuseConnection(ServerConnection *connection);
+  void connectionClosed(ServerConnection *connection);
 
 private:
   void createConnections();
@@ -31,6 +34,7 @@ private:
   Server *_server;
   TSEventFunc _funcp;
   std::list<ServerConnection *> _available_connections;
+  std::list<ServerConnection *> _connections;
 };
 }
 #endif /*_CONNECTION_POOL_H_*/

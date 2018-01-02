@@ -10,7 +10,6 @@
 using namespace ats_plugin;
 ConnectionPool::ConnectionPool(Server *server, TSEventFunc funcp) : _server(server), _funcp(funcp)
 {
-  createConnections();
 }
 
 ConnectionPool::~ConnectionPool()
@@ -21,54 +20,58 @@ ConnectionPool::~ConnectionPool()
 int
 ConnectionPool::checkAvailability()
 {
-  return _available_connections.size();
+  return _connections.size();
 }
+
 ServerConnection *
 ConnectionPool::getAvailableConnection()
 {
-  if (_available_connections.empty())
-    return nullptr;
-
-  // TODO: CHeck if we need this loop, for now connections are in list only if READY
-  ServerConnection *conn = nullptr;
-  for (auto itr = _available_connections.begin(); itr != _available_connections.end(); itr++) {
-    conn = *itr;
-    if (conn->getState() == ServerConnection::READY) {
-      _available_connections.remove(conn);
-      return conn;
-    }
+  if (!_available_connections.empty() && _available_connections.size() > 10) {
+    ServerConnection *conn = _available_connections.front();
+    _available_connections.pop_front();
+    // TODO ASSERT(conn->getState() == ServerConnection::READY)
+    conn->setState(ServerConnection::INUSE);
+    TSDebug(PLUGIN_NAME, "%s: Connection from available pool, %p", __FUNCTION__, conn);
+    return conn;
   }
 
+  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
+  uint maxConn                          = gConfig->getMaxConnLength();
+
+  if (_connections.size() >= maxConn) {
+    TSDebug(PLUGIN_NAME, "%s: Max conn reached, need to queue, maxConn: %d", __FUNCTION__, maxConn);
+    return nullptr;
+  }
+
+  ServerConnection *conn = new ServerConnection(_server, _funcp);
+  addConnection(conn);
+  TSDebug(PLUGIN_NAME, "%s: New Connection created, %p", __FUNCTION__, conn);
   return conn;
 }
 
 void
 ConnectionPool::addConnection(ServerConnection *connection)
 {
+  _connections.push_back(connection);
+}
+
+void
+ConnectionPool::reuseConnection(ServerConnection *connection)
+{
+  connection->setState(ServerConnection::READY);
   _available_connections.push_back(connection);
 }
 
 void
-ConnectionPool::setupNewConnection()
+ConnectionPool::connectionClosed(ServerConnection *connection)
 {
-  ServerConnection *sConn;
-  sConn = new ServerConnection(_server, _funcp);
-  addConnection(sConn);
+  _available_connections.remove(connection);
+  removeConnection(connection);
 }
-void
-ConnectionPool::createConnections()
-{
-  int i = 0;
-  ServerConnection *sConn;
-  // TODO: Read config and available connections and servers and create the connections accordingly
-  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
-  int maxConn                           = gConfig->getMaxConnLength();
-  // int minConn                           = gConfig->getMinConnLength();
-  // int reqQueueLen                       = gConfig->getRequestQueueSize();
 
-  while (i < maxConn) {
-    sConn = new ServerConnection(_server, _funcp);
-    addConnection(sConn);
-    i++;
-  }
+void
+ConnectionPool::removeConnection(ServerConnection *connection)
+{
+  _connections.remove(connection);
+  delete connection;
 }

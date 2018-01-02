@@ -66,19 +66,11 @@ public:
       TSStatIntIncrement(reqId, 1);
       auto intercept = new ats_plugin::ServerIntercept(transaction);
 
-      int size = gServer->checkAvailability();
-      TSDebug(PLUGIN_NAME, "[%s] availability : %d", __FUNCTION__, size);
-      if (size) {
-        transaction.addPlugin(intercept);
-        gServer->connect(intercept);
-        transaction.resume();
-      } else {
-        TSDebug(PLUGIN_NAME, "[%s] Adding to pending list. QueueLength: %lu", __FUNCTION__, gServer->pending_list.size());
-        gServer->pending_list.push(intercept);
-      }
-    } else {
-      transaction.resume();
+      // TSDebug(PLUGIN_NAME, "[%s] availability : %d", __FUNCTION__, size);
+      transaction.addPlugin(intercept);
+      gServer->connect(intercept);
     }
+    transaction.resume();
   }
 };
 

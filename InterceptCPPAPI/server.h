@@ -58,8 +58,15 @@ public:
   int checkAvailability();
   std::queue<ServerIntercept *> pending_list;
 
+  void removeConnection(ServerConnection *server_conn);
+  void reuseConnection(ServerConnection *server_conn);
+  void connectionClosed(ServerConnection *server_conn);
+
+  void reConnect(uint request_id);
+
 private:
-  void createConnections();
+  void createConnectionPool();
+  void initiateBackendConnection(ServerIntercept *intercept, uint request_id);
 
   std::map<uint, std::tuple<ServerIntercept *, ServerConnection *>> _intercept_list;
 

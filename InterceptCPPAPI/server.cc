@@ -58,8 +58,9 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_NET_CONNECT: {
     server_connection->vc_ = (TSVConn)edata;
 
-    server_connection->setState(ServerConnection::READY);
+    server_connection->setState(ServerConnection::INUSE);
 
+    TSDebug(PLUGIN_NAME, "%s: New Connection succesful, %p", __FUNCTION__, server_connection);
     TSDebug(PLUGIN_NAME, "Connected to FCGI Server. vc_ : %p \t _contp: %p \tWriteIO.vio :%p \t ReadIO.vio :%p ",
             server_connection->vc_, server_connection->contp(), server_connection->writeio.vio, server_connection->readio.vio);
     break;
@@ -68,8 +69,12 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_NET_CONNECT_FAILED: {
     TSDebug(PLUGIN_NAME, "[%s] : TSNetConnect Failed.", __FUNCTION__);
 
-    // TODO: Check what to do
-    // server->closeServer();
+    // Try reconnection with new connection.
+    // TODO: Have to stop trying to reconnect after some tries
+    server->reConnect(server_connection->requestId());
+
+    server->removeConnection(server_connection);
+
     return TS_EVENT_NONE;
   }
 
@@ -83,13 +88,15 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
       TSDebug(PLUGIN_NAME, "[%s]: ResponseComplete...Sending Response to client stream. _request_id: %d", __FUNCTION__,
               server_connection->requestId());
       intercept->setResponseOutputComplete();
-      server_connection->setState(ServerConnection::CLOSED);
+
+      server->reuseConnection(server_connection);
       TSStatIntIncrement(InterceptGlobal::respId, 1);
     }
     break;
   }
 
   case TS_EVENT_VCONN_WRITE_READY: {
+    TSDebug(PLUGIN_NAME, "[%s] : Write Ready", __FUNCTION__);
     if (server_connection->writeio.readEnable) {
       TSContCall(TSVIOContGet(server_connection->writeio.vio), TS_EVENT_VCONN_WRITE_COMPLETE, server_connection->writeio.vio);
     }
@@ -105,13 +112,18 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   } break;
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "[%s]: EOS reached.", __FUNCTION__);
+    server->connectionClosed(server_connection);
   } break;
   case TS_EVENT_ERROR: {
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Connection Disconnected...Error...");
     TSVConnAbort(server_connection->vc_, 1);
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
     // sending output complete as no support function provided to abort client connection
-    intercept->setResponseOutputComplete();
+    if (intercept)
+      intercept->setResponseOutputComplete();
+
+    server->connectionClosed(server_connection);
+
     return TS_EVENT_NONE;
   }
 
@@ -130,7 +142,7 @@ Server::server()
 
 Server::Server()
 {
-  createConnections();
+  createConnectionPool();
 }
 
 ServerIntercept *
@@ -166,8 +178,7 @@ Server::removeIntercept(uint request_id)
     serv_conn->setRequestId(0);
     TSDebug(PLUGIN_NAME, "[Server:%s] Adding connection back to connection pool. QueueLength:%lu", __FUNCTION__,
             pending_list.size());
-    serv_conn->setState(ServerConnection::READY);
-    _connection_pool->addConnection(serv_conn);
+    _connection_pool->reuseConnection(serv_conn);
     if (!pending_list.empty()) {
       int size = _connection_pool->checkAvailability();
       TSDebug(PLUGIN_NAME, "[Server:%s] Connection Pool Available Size:%d", __FUNCTION__, size);
@@ -190,49 +201,67 @@ Server::removeIntercept(uint request_id)
 void
 Server::writeRequestHeader(uint request_id)
 {
-  ServerConnection *server_conn  = getServerConnection(request_id);
-  FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
-  unsigned char *clientReq;
-  int reqLen = 0;
+  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Header: request_id: %d", __FUNCTION__, request_id);
+  ServerConnection *server_conn = getServerConnection(request_id);
 
-  // TODO: possibly move all this as one function in server_connection
-  fcgiRequest->createBeginRequest();
-  clientReq = fcgiRequest->addClientRequest(reqLen);
-  // server_conn->setState(ServerConnection::WRITE);
-  bool endflag = false;
-  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+  if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
+    FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
+    unsigned char *clientReq;
+    int reqLen = 0;
+
+    // TODO: possibly move all this as one function in server_connection
+    fcgiRequest->createBeginRequest();
+    clientReq = fcgiRequest->addClientRequest(reqLen);
+    // server_conn->setState(ServerConnection::WRITE);
+    bool endflag = false;
+    server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+    return;
+  } else {
+    TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
+  }
 }
 
 void
 Server::writeRequestBody(uint request_id, const string &data)
 {
-  ServerConnection *server_conn  = getServerConnection(request_id);
-  FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
+  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Body: request_id: %d", __FUNCTION__, request_id);
+  ServerConnection *server_conn = getServerConnection(request_id);
 
-  // TODO: possibly move all this as one function in server_connection
-  unsigned char *clientReq;
-  int reqLen            = 0;
-  fcgiRequest->postData = data;
-  fcgiRequest->postBodyChunk();
-  clientReq    = fcgiRequest->addClientRequest(reqLen);
-  bool endflag = false;
-  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+  if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
+    FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
+
+    // TODO: possibly move all this as one function in server_connection
+    unsigned char *clientReq;
+    int reqLen            = 0;
+    fcgiRequest->postData = data;
+    fcgiRequest->postBodyChunk();
+    clientReq    = fcgiRequest->addClientRequest(reqLen);
+    bool endflag = false;
+    server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+    return;
+  } else {
+    TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
+  }
 }
 
 void
 Server::writeRequestBodyComplete(uint request_id)
 {
-  ServerConnection *server_conn  = getServerConnection(request_id);
-  FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
+  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Complete: request_id: %d", __FUNCTION__, request_id);
+  ServerConnection *server_conn = getServerConnection(request_id);
+  if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
+    FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
 
-  // TODO: possibly move all this as one function in server_connection
-  unsigned char *clientReq;
-  int reqLen = 0;
-  fcgiRequest->emptyParam();
-  clientReq    = fcgiRequest->addClientRequest(reqLen);
-  bool endflag = true;
-  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
-
+    // TODO: possibly move all this as one function in server_connection
+    unsigned char *clientReq;
+    int reqLen = 0;
+    fcgiRequest->emptyParam();
+    clientReq    = fcgiRequest->addClientRequest(reqLen);
+    bool endflag = true;
+    server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+  } else {
+    TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
+  }
   // server_conn->readio.read(server_conn->vc_, server_conn->contp());
 }
 
@@ -243,49 +272,36 @@ Server::connect(ServerIntercept *intercept)
 
   intercept->setRequestId(request_id);
 
-  ServerConnection *conn = _connection_pool->getAvailableConnection();
-
-  TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);
-  conn->setRequestId(request_id);
-
-  // TODO: Check better way to do it
-  _intercept_list[request_id] = std::make_tuple(intercept, conn);
-  // conn->setState(ServerConnection::INUSE);
-  conn->createFCGIClient(intercept->_txn);
+  initiateBackendConnection(intercept, request_id);
 
   return request_id;
 }
 
-// const uint
-// Server::connect(ServerIntercept *intercept)
-// {
-//   const uint request_id = UniqueRequesID::getNext();
+void
+Server::reConnect(uint request_id)
+{
+  ServerIntercept *intercept = getIntercept(request_id);
 
-//   intercept->setRequestId(request_id);
+  _intercept_list.erase(request_id);
 
-//   ServerConnection *conn = _connection_pool->getAvailableConnection();
+  initiateBackendConnection(intercept, request_id);
+}
 
-//   if (conn) {
-//     TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);
-//     conn->setRequestId(request_id);
+void
+Server::initiateBackendConnection(ServerIntercept *intercept, uint request_id)
+{
+  ServerConnection *conn = _connection_pool->getAvailableConnection();
 
-//     // TODO: Check better way to do it
-//     _intercept_list[request_id] = std::make_tuple(intercept, conn);
-//     conn->createFCGIClient(intercept->_txn);
-
-//   } else {
-//     TSDebug(PLUGIN_NAME, "[Server:%s]: Adding to pending list.", __FUNCTION__);
-//     // TODO: put in pending list
-//     pending_list.push(intercept);
-//     // _connection_pool->setupNewConnection();
-//     // ServerConnection *conn = _connection_pool->getAvailableConnection();
-//     // conn->setRequestId(request_id);
-//     // _intercept_list[request_id] = std::make_tuple(intercept, conn);
-//     // conn->createFCGIClient(intercept->_txn);
-//   }
-
-//   return request_id;
-// }
+  if (conn) {
+    TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);
+    conn->setRequestId(request_id);
+    // TODO: Check better way to do it
+    _intercept_list[request_id] = std::make_tuple(intercept, conn);
+    conn->createFCGIClient(intercept->_txn);
+  } else {
+    // TODO: add to request queue
+  }
+}
 
 int
 Server::checkAvailability()
@@ -293,8 +309,27 @@ Server::checkAvailability()
   int size = _connection_pool->checkAvailability();
   return size;
 }
+
 void
-Server::createConnections()
+Server::createConnectionPool()
 {
   _connection_pool = new ConnectionPool(this, handlePHPConnectionEvents);
+}
+
+void
+Server::removeConnection(ServerConnection *server_conn)
+{
+  _connection_pool->removeConnection(server_conn);
+}
+
+void
+Server::reuseConnection(ServerConnection *server_conn)
+{
+  _connection_pool->reuseConnection(server_conn);
+}
+
+void
+Server::connectionClosed(ServerConnection *server_conn)
+{
+  _connection_pool->connectionClosed(server_conn);
 }

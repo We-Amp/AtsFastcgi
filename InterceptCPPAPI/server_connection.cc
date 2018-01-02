@@ -53,6 +53,7 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
+
   if (!this->iobuf) {
     this->iobuf  = TSIOBufferCreate();
     this->reader = TSIOBufferReaderAlloc(this->iobuf);
@@ -61,6 +62,7 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
       TSError("[InterceptIOChannel:%s] Error TSVIO returns null. ", __FUNCTION__);
     }
   }
+
   int num_bytes_written = TSIOBufferWrite(this->iobuf, (const void *)buf, data_size);
   if (num_bytes_written != data_size) {
     TSError("[InterceptIOChannel:%s] Error while writing to buffer! Attempted %d bytes but only "
@@ -69,6 +71,7 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
   }
   total_bytes_written += data_size;
   TSDebug(PLUGIN_NAME, "writeio.vio :%p, Wrote %d bytes on PHP side", this->vio, total_bytes_written);
+
   if (!endflag) {
     TSVIOReenable(this->vio);
   } else {
@@ -117,6 +120,7 @@ ServerConnection::createFCGIClient(TSHttpTxn txn)
 void
 ServerConnection::createConnection()
 {
+  TSDebug(PLUGIN_NAME, "[ServerConnection:%s] : Create Connection called", __FUNCTION__);
   struct sockaddr_in ip_addr;
 
   unsigned short int a, b, c, d, p;
@@ -135,6 +139,9 @@ ServerConnection::createConnection()
   _contp     = TSContCreate(_funcp, TSMutexCreate());
   _sConnInfo = new ServerConnectionInfo(_server, this);
   TSContDataSet(_contp, _sConnInfo);
+
+  // TODO: Need to handle return value of NetConnect
   TSNetConnect(_contp, (struct sockaddr const *)&ip_addr);
+
   TSDebug(PLUGIN_NAME, "[ServerConnection:%s] : Data Set Contp: %p", __FUNCTION__, _contp);
 }
