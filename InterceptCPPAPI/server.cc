@@ -89,7 +89,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
               server_connection->requestId());
       intercept->setResponseOutputComplete();
 
-      server->reuseConnection(server_connection);
       TSStatIntIncrement(InterceptGlobal::respId, 1);
     }
     break;
@@ -140,7 +139,7 @@ Server::server()
   return InterceptGlobal::gServer;
 }
 
-Server::Server()
+Server::Server() : _reqId_mutex(TSMutexCreate()), _conn_mutex(TSMutexCreate())
 {
   createConnectionPool();
 }
@@ -268,7 +267,9 @@ Server::writeRequestBodyComplete(uint request_id)
 const uint
 Server::connect(ServerIntercept *intercept)
 {
+  TSMutexLock(_reqId_mutex);
   const uint request_id = UniqueRequesID::getNext();
+  TSMutexUnlock(_reqId_mutex);
 
   intercept->setRequestId(request_id);
 
@@ -290,7 +291,9 @@ Server::reConnect(uint request_id)
 void
 Server::initiateBackendConnection(ServerIntercept *intercept, uint request_id)
 {
+  TSMutexLock(_conn_mutex);
   ServerConnection *conn = _connection_pool->getAvailableConnection();
+  TSMutexUnlock(_conn_mutex);
 
   if (conn) {
     TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);

@@ -71,6 +71,8 @@ private:
   std::map<uint, std::tuple<ServerIntercept *, ServerConnection *>> _intercept_list;
 
   ConnectionPool *_connection_pool;
+  TSMutex _reqId_mutex;
+  TSMutex _conn_mutex;
 };
 }
 #endif /*__SERVER_H_*/

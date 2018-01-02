@@ -26,7 +26,11 @@ ConnectionPool::checkAvailability()
 ServerConnection *
 ConnectionPool::getAvailableConnection()
 {
-  if (!_available_connections.empty() && _available_connections.size() > 10) {
+  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
+  uint maxConn                          = gConfig->getMaxConnLength();
+
+  if (!_available_connections.empty() && _available_connections.size() == maxConn) {
+    TSDebug(PLUGIN_NAME, "%s: available connections %d", __FUNCTION__, _available_connections.size());
     ServerConnection *conn = _available_connections.front();
     _available_connections.pop_front();
     // TODO ASSERT(conn->getState() == ServerConnection::READY)
@@ -34,9 +38,6 @@ ConnectionPool::getAvailableConnection()
     TSDebug(PLUGIN_NAME, "%s: Connection from available pool, %p", __FUNCTION__, conn);
     return conn;
   }
-
-  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
-  uint maxConn                          = gConfig->getMaxConnLength();
 
   if (_connections.size() >= maxConn) {
     TSDebug(PLUGIN_NAME, "%s: Max conn reached, need to queue, maxConn: %d", __FUNCTION__, maxConn);
@@ -60,6 +61,7 @@ ConnectionPool::reuseConnection(ServerConnection *connection)
 {
   connection->setState(ServerConnection::READY);
   _available_connections.push_back(connection);
+  TSDebug(PLUGIN_NAME, "%s: Connection added, available connections %d", __FUNCTION__, _available_connections.size());
 }
 
 void
