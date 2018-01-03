@@ -85,8 +85,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
               server_connection->requestId());
       intercept->setResponseOutputComplete();
 
-      TSMutexUnlock(TSVIOMutexGet(server_connection->readio.vio));
-
       TSStatIntIncrement(InterceptGlobal::respId, 1);
     }
     break;
@@ -102,7 +100,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_VCONN_WRITE_COMPLETE: {
     TSDebug(PLUGIN_NAME, "[%s]: Start Reading from Server now...", __FUNCTION__);
     server_connection->readio.read(server_connection->vc_, server_connection->contp());
-    TSMutexUnlock(TSVIOMutexGet(server_connection->writeio.vio));
   } break;
   case TS_EVENT_VCONN_READ_COMPLETE: {
     TSDebug(PLUGIN_NAME, "[%s]: Server Read Complete...", __FUNCTION__);
@@ -169,19 +166,18 @@ Server::removeIntercept(uint request_id)
 {
   auto itr = _intercept_list.find(request_id);
   if (itr != _intercept_list.end()) {
-    // ServerIntercept *intercept = std::get<0>(itr->second);
     ServerConnection *serv_conn = std::get<1>(itr->second);
     _intercept_list.erase(itr);
     serv_conn->setRequestId(0);
     TSDebug(PLUGIN_NAME, "[Server:%s] Resetting and Adding connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
             pendingReqQueue->getSize());
     _connection_pool->reuseConnection(serv_conn);
-    if (!pendingReqQueue->isQueueEmpty()) {
-      ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
-      TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
-      connect(intercept);
-    }
-    // delete serv_conn;
+  }
+
+  if (!pendingReqQueue->isQueueEmpty()) {
+    ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
+    TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
+    connect(intercept);
   }
 }
 
@@ -312,6 +308,11 @@ Server::createConnectionPool()
 void
 Server::removeConnection(ServerConnection *server_conn)
 {
+  auto itr = _intercept_list.find(server_conn->requestId());
+  if (itr != _intercept_list.end()) {
+    _intercept_list.erase(itr);
+  }
+
   _connection_pool->removeConnection(server_conn);
 }
 

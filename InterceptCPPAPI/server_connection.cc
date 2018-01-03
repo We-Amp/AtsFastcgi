@@ -73,7 +73,9 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
   TSDebug(PLUGIN_NAME, "writeio.vio :%p, Wrote %d bytes on PHP side", this->vio, total_bytes_written);
 
   if (!endflag) {
+    TSMutexLock(TSVIOMutexGet(vio));
     TSVIOReenable(this->vio);
+    TSMutexUnlock(TSVIOMutexGet(vio));
   } else {
     this->readEnable = true;
     TSDebug(PLUGIN_NAME, "[%s] Done: %ld \tnBytes: %ld", __FUNCTION__, TSVIONDoneGet(this->vio), TSVIONBytesGet(this->vio));
@@ -95,11 +97,11 @@ ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
 
 ServerConnection::~ServerConnection()
 {
-  TSDebug(PLUGIN_NAME, "Destroying server Connection Obj");
+  TSDebug(PLUGIN_NAME, "Destroying server Connection Obj: %p", this);
 
   if (vc_) {
-    TSVConnClose(vc_);
     TSDebug(PLUGIN_NAME, "Closing vc_ : %p", vc_);
+    TSVConnClose(vc_);
   }
   vc_        = nullptr;
   readio.vio = writeio.vio = nullptr;
