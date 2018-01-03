@@ -30,7 +30,7 @@ ConnectionPool::getAvailableConnection()
   uint maxConn                          = gConfig->getMaxConnLength();
 
   if (!_available_connections.empty() && _available_connections.size() == maxConn) {
-    TSDebug(PLUGIN_NAME, "%s: available connections %d", __FUNCTION__, _available_connections.size());
+    TSDebug(PLUGIN_NAME, "%s: available connections %ld", __FUNCTION__, _available_connections.size());
     ServerConnection *conn = _available_connections.front();
     _available_connections.pop_front();
     // TODO ASSERT(conn->getState() == ServerConnection::READY)
@@ -59,9 +59,15 @@ ConnectionPool::addConnection(ServerConnection *connection)
 void
 ConnectionPool::reuseConnection(ServerConnection *connection)
 {
+  connection->readio.readEnable  = false;
+  connection->writeio.readEnable = false;
+
+  TSMutexLock(TSVIOMutexGet(connection->readio.vio));
+  TSMutexLock(TSVIOMutexGet(connection->writeio.vio));
+
   connection->setState(ServerConnection::READY);
   _available_connections.push_back(connection);
-  TSDebug(PLUGIN_NAME, "%s: Connection added, available connections %d", __FUNCTION__, _available_connections.size());
+  TSDebug(PLUGIN_NAME, "%s: Connection added, available connections %ld", __FUNCTION__, _available_connections.size());
 }
 
 void

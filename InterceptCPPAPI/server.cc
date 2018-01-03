@@ -50,10 +50,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   Server *server                      = conn_info->server;
   ServerConnection *server_connection = conn_info->server_connection;
 
-  // ServerIntercept *fcgi         = fcgi_server->getIntercept(request_id);
-  // InterceptIO *server            = fcgi->server;
-  // FCGIClientRequest *fcgiRequest = fcgi->server->fcgiRequest;
-
   switch (event) {
   case TS_EVENT_NET_CONNECT: {
     server_connection->vc_ = (TSVConn)edata;
@@ -89,6 +85,8 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
               server_connection->requestId());
       intercept->setResponseOutputComplete();
 
+      TSMutexUnlock(TSVIOMutexGet(server_connection->readio.vio));
+
       TSStatIntIncrement(InterceptGlobal::respId, 1);
     }
     break;
@@ -104,6 +102,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_VCONN_WRITE_COMPLETE: {
     TSDebug(PLUGIN_NAME, "[%s]: Start Reading from Server now...", __FUNCTION__);
     server_connection->readio.read(server_connection->vc_, server_connection->contp());
+    TSMutexUnlock(TSVIOMutexGet(server_connection->writeio.vio));
   } break;
   case TS_EVENT_VCONN_READ_COMPLETE: {
     TSDebug(PLUGIN_NAME, "[%s]: Server Read Complete...", __FUNCTION__);
