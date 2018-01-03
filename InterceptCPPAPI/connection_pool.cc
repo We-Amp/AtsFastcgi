@@ -20,7 +20,7 @@ ConnectionPool::~ConnectionPool()
 int
 ConnectionPool::checkAvailability()
 {
-  return _connections.size();
+  return _available_connections.size();
 }
 
 ServerConnection *

@@ -2,8 +2,8 @@
 #define __SERVER_H_
 
 #include "server_intercept.h"
+#include "request_queue.h"
 #include <map>
-#include <queue>
 namespace ats_plugin
 {
 class ServerIntercept;
@@ -56,17 +56,16 @@ public:
   void operator=(Server const &) = delete;
 
   int checkAvailability();
-  std::queue<ServerIntercept *> pending_list;
-
+  RequestQueue *pendingReqQueue;
   void removeConnection(ServerConnection *server_conn);
   void reuseConnection(ServerConnection *server_conn);
   void connectionClosed(ServerConnection *server_conn);
 
-  void reConnect(uint request_id);
+  void reConnect(ServerConnection *server_conn, uint request_id);
 
 private:
   void createConnectionPool();
-  void initiateBackendConnection(ServerIntercept *intercept, uint request_id);
+  void initiateBackendConnection(ServerIntercept *intercept, ServerConnection *conn);
 
   std::map<uint, std::tuple<ServerIntercept *, ServerConnection *>> _intercept_list;
 

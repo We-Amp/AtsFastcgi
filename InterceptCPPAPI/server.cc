@@ -67,7 +67,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
     // Try reconnection with new connection.
     // TODO: Have to stop trying to reconnect after some tries
-    server->reConnect(server_connection->requestId());
+    server->reConnect(server_connection, server_connection->requestId());
 
     server->removeConnection(server_connection);
 
@@ -141,6 +141,7 @@ Server::server()
 Server::Server() : _reqId_mutex(TSMutexCreate()), _conn_mutex(TSMutexCreate())
 {
   createConnectionPool();
+  pendingReqQueue = new RequestQueue();
 }
 
 ServerIntercept *
@@ -171,26 +172,14 @@ Server::removeIntercept(uint request_id)
     // ServerIntercept *intercept = std::get<0>(itr->second);
     ServerConnection *serv_conn = std::get<1>(itr->second);
     _intercept_list.erase(itr);
-
-    TSDebug(PLUGIN_NAME, "Reset  server Connection Obj");
     serv_conn->setRequestId(0);
-    TSDebug(PLUGIN_NAME, "[Server:%s] Adding connection back to connection pool. QueueLength:%lu", __FUNCTION__,
-            pending_list.size());
+    TSDebug(PLUGIN_NAME, "[Server:%s] Resetting and Adding connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
+            pendingReqQueue->getSize());
     _connection_pool->reuseConnection(serv_conn);
-    if (!pending_list.empty()) {
-      int size = _connection_pool->checkAvailability();
-      TSDebug(PLUGIN_NAME, "[Server:%s] Connection Pool Available Size:%d", __FUNCTION__, size);
-      if (size) {
-        TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
-        ServerIntercept *intercept = pending_list.front();
-        pending_list.pop();
-        Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
-        transaction.addPlugin(intercept);
-        server()->connect(intercept);
-        transaction.resume();
-      } else {
-        TSDebug(PLUGIN_NAME, "[Server:%s] Connection Not available. QueueSize: %lu", __FUNCTION__, pending_list.size());
-      }
+    if (!pendingReqQueue->isQueueEmpty()) {
+      ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
+      TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
+      connect(intercept);
     }
     // delete serv_conn;
   }
@@ -266,43 +255,45 @@ Server::writeRequestBodyComplete(uint request_id)
 const uint
 Server::connect(ServerIntercept *intercept)
 {
-  TSMutexLock(_reqId_mutex);
-  const uint request_id = UniqueRequesID::getNext();
-  TSMutexUnlock(_reqId_mutex);
-
-  intercept->setRequestId(request_id);
-
-  initiateBackendConnection(intercept, request_id);
-
-  return request_id;
-}
-
-void
-Server::reConnect(uint request_id)
-{
-  ServerIntercept *intercept = getIntercept(request_id);
-
-  _intercept_list.erase(request_id);
-
-  initiateBackendConnection(intercept, request_id);
-}
-
-void
-Server::initiateBackendConnection(ServerIntercept *intercept, uint request_id)
-{
   TSMutexLock(_conn_mutex);
   ServerConnection *conn = _connection_pool->getAvailableConnection();
   TSMutexUnlock(_conn_mutex);
 
-  if (conn) {
+  if (conn != nullptr) {
     TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);
-    conn->setRequestId(request_id);
-    // TODO: Check better way to do it
-    _intercept_list[request_id] = std::make_tuple(intercept, conn);
-    conn->createFCGIClient(intercept->_txn);
+    initiateBackendConnection(intercept, conn);
   } else {
-    // TODO: add to request queue
+    pendingReqQueue->addToQueue(intercept);
+    TSDebug(PLUGIN_NAME, "[Server:%s] : Added to RequestQueue. QueueSize: %d", __FUNCTION__, pendingReqQueue->getSize());
   }
+
+  return 0;
+}
+
+void
+Server::reConnect(ServerConnection *server_conn, uint request_id)
+{
+  ServerIntercept *intercept = getIntercept(request_id);
+  _intercept_list.erase(request_id);
+  TSDebug(PLUGIN_NAME, "[Server:%s]: Initiating reconnection...", __FUNCTION__);
+  connect(intercept);
+}
+
+void
+Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *conn)
+{
+  Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+  transaction.addPlugin(intercept);
+
+  TSMutexLock(_reqId_mutex);
+  const uint request_id = UniqueRequesID::getNext();
+  TSMutexUnlock(_reqId_mutex);
+  intercept->setRequestId(request_id);
+  conn->setRequestId(request_id);
+  // TODO: Check better way to do it
+  _intercept_list[request_id] = std::make_tuple(intercept, conn);
+  conn->createFCGIClient(intercept->_txn);
+  transaction.resume();
 }
 
 int
