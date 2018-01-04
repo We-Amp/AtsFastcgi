@@ -8,6 +8,7 @@ RequestQueue::RequestQueue()
   FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
   max_queue_size            = gConfig->getRequestQueueSize();
 }
+
 RequestQueue::~RequestQueue()
 {
   max_queue_size = 0;
@@ -23,11 +24,13 @@ RequestQueue::isQueueFull()
     return 0;
   }
 }
+
 uint
 RequestQueue::getSize()
 {
   return pending_list.size();
 }
+
 uint
 RequestQueue::isQueueEmpty()
 {
@@ -37,38 +40,28 @@ RequestQueue::isQueueEmpty()
     return 0;
   }
 }
+
 uint
 RequestQueue::addToQueue(ServerIntercept *intercept)
 {
-  TSReturnCode status;
   if (!isQueueFull()) {
-    status = TSMutexLockTry(mutex);
-    if (status == TS_SUCCESS) {
-      pending_list.push(intercept);
-      TSMutexUnlock(mutex);
-      return 1;
-    } else {
-      return 0;
-    }
-  } else {
-    return 0;
+    TSMutexLock(mutex);
+    pending_list.push(intercept);
+    TSMutexUnlock(mutex);
+    return 1;
   }
+  return 0;
 }
+
 ServerIntercept *
 RequestQueue::removeFromQueue()
 {
-  TSReturnCode status;
   if (!isQueueEmpty()) {
-    status = TSMutexLockTry(mutex);
-    if (status == TS_SUCCESS) {
-      ServerIntercept *intercept = pending_list.front();
-      pending_list.pop();
-      TSMutexUnlock(mutex);
-      return intercept;
-    } else {
-      return nullptr;
-    }
-  } else {
-    return nullptr;
+    TSMutexLock(mutex);
+    ServerIntercept *intercept = pending_list.front();
+    pending_list.pop();
+    TSMutexUnlock(mutex);
+    return intercept;
   }
+  return nullptr;
 }
