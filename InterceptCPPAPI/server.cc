@@ -69,7 +69,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     // TODO: Have to stop trying to reconnect after some tries
     server->reConnect(server_connection, server_connection->requestId());
 
-    server->removeConnection(server_connection);
+    server->connectionClosed(server_connection);
 
     return TS_EVENT_NONE;
   }
@@ -107,6 +107,14 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   } break;
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "[%s]: EOS reached.", __FUNCTION__);
+
+    ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
+    // sending output complete as no support function provided to abort client connection
+    if (intercept) {
+      TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS intercept->setResponseOutputComplete");
+      intercept->setResponseOutputComplete();
+    }
+
     server->connectionClosed(server_connection);
   } break;
   case TS_EVENT_ERROR: {
@@ -114,8 +122,10 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     TSVConnAbort(server_connection->vc_, 1);
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
     // sending output complete as no support function provided to abort client connection
-    if (intercept)
+    if (intercept) {
+      TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents:ERROR  intercept->setResponseOutputComplete");
       intercept->setResponseOutputComplete();
+    }
 
     server->connectionClosed(server_connection);
 
@@ -256,7 +266,7 @@ Server::connect(ServerIntercept *intercept)
   TSMutexUnlock(_conn_mutex);
 
   if (conn != nullptr) {
-    TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...vc_: %p", __FUNCTION__, conn->vc_);
+    TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...conn: %p, vc_: %p", __FUNCTION__, conn, conn->vc_);
     initiateBackendConnection(intercept, conn);
   } else {
     pendingReqQueue->addToQueue(intercept);
@@ -306,24 +316,22 @@ Server::createConnectionPool()
 }
 
 void
-Server::removeConnection(ServerConnection *server_conn)
+Server::reuseConnection(ServerConnection *server_conn)
+{
+  TSMutexLock(_conn_mutex);
+  _connection_pool->reuseConnection(server_conn);
+  TSMutexUnlock(_conn_mutex);
+}
+
+void
+Server::connectionClosed(ServerConnection *server_conn)
 {
   auto itr = _intercept_list.find(server_conn->requestId());
   if (itr != _intercept_list.end()) {
     _intercept_list.erase(itr);
   }
 
-  _connection_pool->removeConnection(server_conn);
-}
-
-void
-Server::reuseConnection(ServerConnection *server_conn)
-{
-  _connection_pool->reuseConnection(server_conn);
-}
-
-void
-Server::connectionClosed(ServerConnection *server_conn)
-{
+  TSMutexLock(_conn_mutex);
   _connection_pool->connectionClosed(server_conn);
+  TSMutexUnlock(_conn_mutex);
 }

@@ -57,7 +57,6 @@ public:
 
   int checkAvailability();
   RequestQueue *pendingReqQueue;
-  void removeConnection(ServerConnection *server_conn);
   void reuseConnection(ServerConnection *server_conn);
   void connectionClosed(ServerConnection *server_conn);
 

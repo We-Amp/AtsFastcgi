@@ -24,7 +24,6 @@ public:
   int checkAvailability();
 
   void addConnection(ServerConnection *);
-  void removeConnection(ServerConnection *);
   void reuseConnection(ServerConnection *connection);
   void connectionClosed(ServerConnection *connection);
 

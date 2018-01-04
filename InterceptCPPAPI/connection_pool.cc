@@ -71,12 +71,6 @@ void
 ConnectionPool::connectionClosed(ServerConnection *connection)
 {
   _available_connections.remove(connection);
-  removeConnection(connection);
-}
-
-void
-ConnectionPool::removeConnection(ServerConnection *connection)
-{
   _connections.remove(connection);
   delete connection;
 }
