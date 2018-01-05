@@ -71,6 +71,7 @@ private:
   ConnectionPool *_connection_pool;
   TSMutex _reqId_mutex;
   TSMutex _conn_mutex;
+  TSMutex _intecept_mutex;
 };
 }
 #endif /*__SERVER_H_*/

@@ -112,7 +112,8 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     // sending output complete as no support function provided to abort client connection
     if (intercept) {
       TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS intercept->setResponseOutputComplete");
-      intercept->setResponseOutputComplete();
+      Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+      transaction.error("Internal server error");
     }
 
     server->connectionClosed(server_connection);
@@ -124,7 +125,8 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     // sending output complete as no support function provided to abort client connection
     if (intercept) {
       TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents:ERROR  intercept->setResponseOutputComplete");
-      intercept->setResponseOutputComplete();
+      Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+      transaction.error("Internal server error");
     }
 
     server->connectionClosed(server_connection);
@@ -145,7 +147,7 @@ Server::server()
   return InterceptGlobal::gServer;
 }
 
-Server::Server() : _reqId_mutex(TSMutexCreate()), _conn_mutex(TSMutexCreate())
+Server::Server() : _reqId_mutex(TSMutexCreate()), _conn_mutex(TSMutexCreate()), _intecept_mutex(TSMutexCreate())
 {
   createConnectionPool();
   pendingReqQueue = new RequestQueue();
@@ -177,7 +179,11 @@ Server::removeIntercept(uint request_id)
   auto itr = _intercept_list.find(request_id);
   if (itr != _intercept_list.end()) {
     ServerConnection *serv_conn = std::get<1>(itr->second);
+
+    TSMutexLock(_intecept_mutex);
     _intercept_list.erase(itr);
+    TSMutexUnlock(_intecept_mutex);
+
     serv_conn->setRequestId(0);
     TSDebug(PLUGIN_NAME, "[Server:%s] Resetting and Adding connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
             pendingReqQueue->getSize());
@@ -280,7 +286,11 @@ void
 Server::reConnect(ServerConnection *server_conn, uint request_id)
 {
   ServerIntercept *intercept = getIntercept(request_id);
+
+  TSMutexLock(_intecept_mutex);
   _intercept_list.erase(request_id);
+  TSMutexUnlock(_intecept_mutex);
+
   TSDebug(PLUGIN_NAME, "[Server:%s]: Initiating reconnection...", __FUNCTION__);
   connect(intercept);
 }
@@ -297,7 +307,10 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   intercept->setRequestId(request_id);
   conn->setRequestId(request_id);
   // TODO: Check better way to do it
+  TSMutexLock(_intecept_mutex);
   _intercept_list[request_id] = std::make_tuple(intercept, conn);
+  TSMutexUnlock(_intecept_mutex);
+
   conn->createFCGIClient(intercept->_txn);
   transaction.resume();
 }
@@ -326,10 +339,14 @@ Server::reuseConnection(ServerConnection *server_conn)
 void
 Server::connectionClosed(ServerConnection *server_conn)
 {
+  TSMutexLock(_intecept_mutex);
+
   auto itr = _intercept_list.find(server_conn->requestId());
   if (itr != _intercept_list.end()) {
     _intercept_list.erase(itr);
   }
+
+  TSMutexUnlock(_intecept_mutex);
 
   TSMutexLock(_conn_mutex);
   _connection_pool->connectionClosed(server_conn);
