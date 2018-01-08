@@ -55,20 +55,17 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
     Headers &h               = transaction.getClientRequest().getHeaders();
 
     if (h.isInitialized()) {
-      cout << "Header Count: " << h.size() << endl;
       string key("Content-Length");
       atscppapi::header_field_iterator it = h.find(key);
       atscppapi::HeaderField hf(*it);
-      value = hf.values(value);
-      cout << "Content Length Value: " << value << endl;
+      value                                    = hf.values(value);
       state_->requestHeaders["CONTENT_LENGTH"] = value.c_str();
       // TODO atscppapi::header_field_value_iterator hfv = hf.begin();
       key = string("Content-type");
       it  = h.find(key);
       HeaderField hf1(*it);
-      value = "";
-      value = hf1.values(value);
-      cout << "Content TYPE Value: " << value << endl;
+      value                                  = "";
+      value                                  = hf1.values(value);
       state_->requestHeaders["CONTENT_TYPE"] = value.c_str();
     }
 
@@ -76,7 +73,6 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
     string cl         = state_->requestHeaders["CONTENT_LENGTH"];
     stringstream strToInt(cl);
     strToInt >> contentLength;
-    cout << "Content Length to Int" << contentLength << endl;
     state_->buff = (unsigned char *)TSmalloc(BUF_SIZE + contentLength);
   } else {
     state_->buff = (unsigned char *)TSmalloc(BUF_SIZE);
@@ -102,13 +98,9 @@ FCGIClientRequest::GenerateFcgiRequestHeaders()
   Transaction &transaction = utils::internal::getTransaction(state_->txn_);
   Headers &h               = transaction.getClientRequest().getHeaders();
   if (h.isInitialized()) {
-    cout << "Header Count: " << h.size() << endl;
-    // string key("Content-Length");
     atscppapi::header_field_iterator it = h.begin();
     for (it = h.begin(); it != h.end(); ++it) {
       atscppapi::HeaderField hf(*it);
-      // cout << hf.name() << " => " << hf.values() << endl;
-      // fcgiReqHeader[hf.name()] = hf.values();
     }
   }
   fcgiReqHeader["DOCUMET_ROOT"]      = InterceptGlobal::plugin_data->getGlobalConfigObj()->getDocumentRootDir();
