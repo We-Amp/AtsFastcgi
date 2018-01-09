@@ -50,6 +50,11 @@ InterceptIOChannel::write(TSVConn vc, TSCont contp)
 void
 InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size, bool endflag)
 {
+  // #ifdef ATS_FCGI_PROFILER
+  //   using namespace InterceptGlobal;
+  //   Profiler::ProfileTaker profile_taker1(&profiler, "phpWrite", (std::size_t)&plugin, "B");
+  // #endif
+
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }

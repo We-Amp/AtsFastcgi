@@ -8,9 +8,12 @@
 #define ATS_MOD_FCGI_VERSION "ats_mod_fcgi"
 #define ATS_MOD_LOG_FILENAME "atsModFCGI.log"
 
+#define ATS_FCGI_PROFILER true
+
 #include "fcgi_config.h"
 #include <atscppapi/GlobalPlugin.h>
 #include "server.h"
+#include "Profiler.h"
 
 using namespace atscppapi;
 
@@ -23,6 +26,9 @@ extern ats_plugin::InterceptPluginData *plugin_data;
 // TODO (Rakesh): Move to FCGI connect file
 extern ats_plugin::Server *gServer;
 extern int reqId, respId;
+#ifdef ATS_FCGI_PROFILER
+extern ats_plugin::Profiler profiler;
+#endif
 }
 
 /*

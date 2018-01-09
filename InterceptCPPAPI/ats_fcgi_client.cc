@@ -110,7 +110,7 @@ FCGIClientRequest::GenerateFcgiRequestHeaders()
   fcgiReqHeader["SCRIPT_NAME"]       = transaction.getClientRequest().getUrl().getPath();
   fcgiReqHeader["QUERY_STRING"]      = transaction.getClientRequest().getUrl().getQuery();
   fcgiReqHeader["REQUEST_URI"]       = transaction.getClientRequest().getUrl().getPath();
-
+  fcgiReqHeader["REQUEST_ID"]        = std::to_string(state_->request_id_);
   // TODO map fcgiconfig with request headers.
   // atsfcgiconfig::FCGIParams *params      = fcgiGlobal::plugin_data->getGlobalConfigObj()->getFcgiParams();
   // atsfcgiconfig::FCGIParams::iterator it = params->begin();
@@ -166,8 +166,7 @@ FCGIClientRequest::createHeader(uchar type)
 FCGI_BeginRequest *
 FCGIClientRequest::createBeginRequest()
 {
-  state_->request = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
-  // TODO send the request id here
+  state_->request                          = (FCGI_BeginRequest *)TSmalloc(sizeof(FCGI_BeginRequest));
   state_->request->header                  = createHeader(FCGI_BEGIN_REQUEST);
   state_->request->body                    = (FCGI_BeginRequestBody *)calloc(1, sizeof(FCGI_BeginRequestBody));
   state_->request->body->roleB0            = FCGI_RESPONDER;
@@ -210,7 +209,6 @@ FCGIClientRequest::createBeginRequest()
 void
 FCGIClientRequest::postBodyChunk()
 {
-  TSDebug(PLUGIN_NAME, "serializing post data");
   state_->pBuffInc   = state_->buff;
   int dataLen        = 0;
   state_->postHeader = createHeader(FCGI_STDIN);

@@ -59,6 +59,12 @@ ConnectionPool::addConnection(ServerConnection *connection)
 void
 ConnectionPool::reuseConnection(ServerConnection *connection)
 {
+#ifdef ATS_FCGI_PROFILER
+  using namespace InterceptGlobal;
+  auto _connectionPool = this;
+  ats_plugin::ProfileTaker profile_taker1(&profiler, "reuseConnection", (std::size_t)&_connectionPool, "B");
+#endif
+
   connection->readio.readEnable  = false;
   connection->writeio.readEnable = false;
 

@@ -7,6 +7,7 @@
 #include "server_connection.h"
 #include "connection_pool.h"
 #include "ats_mod_intercept.h"
+
 using namespace ats_plugin;
 
 uint UniqueRequesID::_id = 1;
@@ -107,7 +108,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     TSDebug(PLUGIN_NAME, "[%s]: EOS reached.", __FUNCTION__);
 
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
-    // sending output complete as no support function provided to abort client connection
     if (intercept) {
       TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS intercept->setResponseOutputComplete");
       Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
@@ -120,7 +120,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: Connection Disconnected...Error...");
     TSVConnAbort(server_connection->vc_, 1);
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
-    // sending output complete as no support function provided to abort client connection
+
     if (intercept) {
       TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents:ERROR  intercept->setResponseOutputComplete");
       Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
@@ -174,6 +174,10 @@ Server::getServerConnection(uint request_id)
 void
 Server::removeIntercept(uint request_id)
 {
+#ifdef ATS_FCGI_PROFILER
+  using namespace InterceptGlobal;
+  ats_plugin::ProfileTaker profile_taker1(&profiler, "removeIntercept", (std::size_t)&gServer, "B");
+#endif
   auto itr = _intercept_list.find(request_id);
   if (itr != _intercept_list.end()) {
     ServerConnection *serv_conn = std::get<1>(itr->second);
@@ -181,7 +185,6 @@ Server::removeIntercept(uint request_id)
     TSMutexLock(_intecept_mutex);
     _intercept_list.erase(itr);
     TSMutexUnlock(_intecept_mutex);
-
     serv_conn->setRequestId(0);
     TSDebug(PLUGIN_NAME, "[Server:%s] Resetting and Adding connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
             pendingReqQueue->getSize());
@@ -208,8 +211,7 @@ Server::writeRequestHeader(uint request_id)
 
     // TODO: possibly move all this as one function in server_connection
     fcgiRequest->createBeginRequest();
-    clientReq = fcgiRequest->addClientRequest(reqLen);
-    // server_conn->setState(ServerConnection::WRITE);
+    clientReq    = fcgiRequest->addClientRequest(reqLen);
     bool endflag = false;
     server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
     return;
@@ -259,12 +261,15 @@ Server::writeRequestBodyComplete(uint request_id)
   } else {
     TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
   }
-  // server_conn->readio.read(server_conn->vc_, server_conn->contp());
 }
 
 const uint
 Server::connect(ServerIntercept *intercept)
 {
+#ifdef ATS_FCGI_PROFILER
+  using namespace InterceptGlobal;
+  ats_plugin::ProfileTaker profile_taker(&profiler, "connect", (std::size_t)&gServer, "B");
+#endif
   TSMutexLock(_conn_mutex);
   ServerConnection *conn = _connection_pool->getAvailableConnection();
   TSMutexUnlock(_conn_mutex);
@@ -283,6 +288,10 @@ Server::connect(ServerIntercept *intercept)
 void
 Server::reConnect(ServerConnection *server_conn, uint request_id)
 {
+#ifdef ATS_FCGI_PROFILER
+  using namespace InterceptGlobal;
+  ats_plugin::ProfileTaker profile_taker2(&profiler, "reConnect", (std::size_t)&gServer, "B");
+#endif
   ServerIntercept *intercept = getIntercept(request_id);
 
   TSMutexLock(_intecept_mutex);
