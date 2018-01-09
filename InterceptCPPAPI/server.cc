@@ -76,11 +76,9 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_READ_READY: {
     TSDebug(PLUGIN_NAME, "[%s]: Inside Read Ready...VConn Open vc_: %p", __FUNCTION__, server_connection->vc_);
-    bool responseStatus        = false;
-    ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
-    responseStatus             = interceptTransferData(intercept, server_connection);
 
-    if (responseStatus == true) {
+    ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
+    if (intercept && interceptTransferData(intercept, server_connection)) {
       TSDebug(PLUGIN_NAME, "[%s]: ResponseComplete...Sending Response to client stream. _request_id: %d", __FUNCTION__,
               server_connection->requestId());
       intercept->setResponseOutputComplete();
@@ -292,7 +290,8 @@ Server::reConnect(ServerConnection *server_conn, uint request_id)
   TSMutexUnlock(_intecept_mutex);
 
   TSDebug(PLUGIN_NAME, "[Server:%s]: Initiating reconnection...", __FUNCTION__);
-  connect(intercept);
+  if (intercept)
+    connect(intercept);
 }
 
 void
@@ -304,8 +303,10 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   TSMutexLock(_reqId_mutex);
   const uint request_id = UniqueRequesID::getNext();
   TSMutexUnlock(_reqId_mutex);
+
   intercept->setRequestId(request_id);
   conn->setRequestId(request_id);
+
   // TODO: Check better way to do it
   TSMutexLock(_intecept_mutex);
   _intercept_list[request_id] = std::make_tuple(intercept, conn);
