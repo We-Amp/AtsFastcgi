@@ -65,7 +65,10 @@ public:
     if (path.find("php") != string::npos) {
       TSStatIntIncrement(reqId, 1);
       auto intercept = new ats_plugin::ServerIntercept(transaction);
+      transaction.addPlugin(intercept);
+      transaction.resume();
       gServer->connect(intercept);
+
     } else {
       transaction.resume();
     }

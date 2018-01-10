@@ -45,7 +45,7 @@ ConnectionPool::getAvailableConnection()
   }
 
   ServerConnection *conn = new ServerConnection(_server, _funcp);
-  // addConnection(conn);
+  addConnection(conn);
   TSDebug(PLUGIN_NAME, "%s: New Connection created, %p", __FUNCTION__, conn);
   return conn;
 }

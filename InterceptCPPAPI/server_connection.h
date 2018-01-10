@@ -74,9 +74,9 @@ public:
   InterceptIOChannel readio;
   InterceptIOChannel writeio;
   FCGIClientRequest *_fcgiRequest;
+  void createConnection();
 
 private:
-  void createConnection();
   State _state;
   Server *_server;
   TSEventFunc _funcp;

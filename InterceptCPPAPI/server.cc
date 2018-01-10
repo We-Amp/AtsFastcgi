@@ -56,11 +56,17 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
     auto _connection_pool = server->getConnectionPool();
     server_connection->setState(ServerConnection::INUSE);
-    _connection_pool->addConnection(server_connection);
+    //_connection_pool->addConnection(server_connection);
 
     TSDebug(PLUGIN_NAME, "%s: New Connection succesful, %p", __FUNCTION__, server_connection);
     TSDebug(PLUGIN_NAME, "Connected to FCGI Server. vc_ : %p \t _contp: %p \tWriteIO.vio :%p \t ReadIO.vio :%p ",
             server_connection->vc_, server_connection->contp(), server_connection->writeio.vio, server_connection->readio.vio);
+
+    ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
+    if (intercept) {
+      // server_connection->createFCGIClient(intercept->_txn);
+      intercept->resumeIntercept();
+    }
     break;
   }
 
@@ -74,7 +80,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     server->connectionClosed(server_connection);
 
     return TS_EVENT_NONE;
-  }
+  } break;
 
   case TS_EVENT_VCONN_READ_READY: {
     TSDebug(PLUGIN_NAME, "[%s]: Inside Read Ready...VConn Open vc_: %p", __FUNCTION__, server_connection->vc_);
@@ -108,13 +114,14 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "[%s]: EOS reached.", __FUNCTION__);
 
-    // ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
+    ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
+
     // sending output complete as no support function provided to abort client connection
-    // if (intercept) {
-    //   TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS intercept->setResponseOutputComplete");
-    //   Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
-    //   transaction.error("Internal server error");
-    // }
+    if (intercept && !intercept->getOutputCompleteState()) {
+      TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS intercept->setResponseOutputComplete");
+      Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+      transaction.error("Internal server error");
+    }
 
     server->connectionClosed(server_connection);
   } break;
@@ -272,7 +279,19 @@ Server::connect(ServerIntercept *intercept)
   ServerConnection *conn = _connection_pool->getAvailableConnection();
   TSMutexUnlock(_conn_mutex);
 
-  if (conn && conn->getState() == ServerConnection::INUSE) {
+  TSMutexLock(_reqId_mutex);
+  const uint request_id = UniqueRequesID::getNext();
+  TSMutexUnlock(_reqId_mutex);
+
+  intercept->setRequestId(request_id);
+  if (conn) {
+    intercept->setServerConn(conn);
+    conn->setRequestId(request_id);
+
+    // TODO: Check better way to do it
+    TSMutexLock(_intecept_mutex);
+    _intercept_list[request_id] = std::make_tuple(intercept, conn);
+    TSMutexUnlock(_intecept_mutex);
     TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...conn: %p, vc_: %p", __FUNCTION__, conn, conn->vc_);
     initiateBackendConnection(intercept, conn);
   } else {
@@ -300,24 +319,10 @@ Server::reConnect(ServerConnection *server_conn, uint request_id)
 void
 Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *conn)
 {
-  Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
-  transaction.addPlugin(intercept);
-
-  TSMutexLock(_reqId_mutex);
-  const uint request_id = UniqueRequesID::getNext();
-  TSMutexUnlock(_reqId_mutex);
-
-  intercept->setRequestId(request_id);
-  intercept->setServerConn(conn);
-  conn->setRequestId(request_id);
-
-  // TODO: Check better way to do it
-  TSMutexLock(_intecept_mutex);
-  _intercept_list[request_id] = std::make_tuple(intercept, conn);
-  TSMutexUnlock(_intecept_mutex);
-
   conn->createFCGIClient(intercept->_txn);
-  transaction.resume();
+  if (conn->getState() != ServerConnection::INUSE) {
+    conn->createConnection();
+  }
 }
 
 int

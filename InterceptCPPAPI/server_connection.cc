@@ -92,7 +92,7 @@ ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
     _sConnInfo(nullptr),
     _requestId(0)
 {
-  createConnection();
+  // createConnection();
 }
 
 ServerConnection::~ServerConnection()

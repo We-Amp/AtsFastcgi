@@ -18,6 +18,7 @@
 #include "ats_fcgi_client.h"
 #include "fcgi_config.h"
 #include "server.h"
+#include "server_connection.h"
 
 using namespace atscppapi;
 using namespace ats_plugin;
@@ -34,7 +35,6 @@ ServerIntercept::consume(const string &data, InterceptPlugin::RequestDataType ty
   if (type == InterceptPlugin::REQUEST_HEADER) {
     TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Read request header data.", __FUNCTION__);
     streamReqHeader(data);
-
   } else {
     streamReqBody(data);
   }
@@ -43,23 +43,45 @@ ServerIntercept::consume(const string &data, InterceptPlugin::RequestDataType ty
 void
 ServerIntercept::streamReqHeader(const string &data)
 {
-  TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] headCount: %d \t_request_id:%d", __FUNCTION__, headCount++, _request_id);
-  Server::server()->writeRequestHeader(_request_id, _server_conn);
+  if (_server_conn && _server_conn->getState() == ServerConnection::INUSE) {
+    TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] headCount: %d \t_request_id:%d", __FUNCTION__, headCount++, _request_id);
+    Server::server()->writeRequestHeader(_request_id, _server_conn);
+  } else {
+    TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Buffering client Req Header.", __FUNCTION__);
+    clientHeader += data;
+  }
 }
 void
 ServerIntercept::streamReqBody(const string &data)
 {
-  TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] bodyCount: %d", __FUNCTION__, bodyCount++);
-  Server::server()->writeRequestBody(_request_id, _server_conn, data);
+  if (_server_conn && _server_conn->getState() == ServerConnection::INUSE) {
+    TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] bodyCount: %d", __FUNCTION__, bodyCount++);
+    Server::server()->writeRequestBody(_request_id, _server_conn, data);
+  } else {
+    TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Buffering client Req Body.", __FUNCTION__);
+    clientBody += data;
+  }
 }
 
 void
 ServerIntercept::handleInputComplete()
 {
-  TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Count : %d \t_request_id: %d", __FUNCTION__, emptyCount++, _request_id);
-  Server::server()->writeRequestBodyComplete(_request_id, _server_conn);
+  if (_server_conn && _server_conn->getState() == ServerConnection::INUSE) {
+    TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Count : %d \t_request_id: %d", __FUNCTION__, emptyCount++, _request_id);
+    Server::server()->writeRequestBodyComplete(_request_id, _server_conn);
+  } else {
+    inputCompleteState = true;
+  }
 }
 
+void
+ServerIntercept::resumeIntercept()
+{
+  Server::server()->writeRequestHeader(_request_id, _server_conn);
+  Server::server()->writeRequestBody(_request_id, _server_conn, clientBody);
+  if (inputCompleteState)
+    Server::server()->writeRequestBodyComplete(_request_id, _server_conn);
+}
 void
 ServerIntercept::writeResponseChunkToATS(std::string &data)
 {
@@ -70,4 +92,5 @@ void
 ServerIntercept::setResponseOutputComplete()
 {
   InterceptPlugin::setOutputComplete();
+  outputCompleteState = true;
 }

@@ -36,7 +36,8 @@ public:
 
   ServerIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
   {
-    _txn = static_cast<TSHttpTxn>(transaction.getAtsHandle());
+    _server_conn = nullptr;
+    _txn         = static_cast<TSHttpTxn>(transaction.getAtsHandle());
     TSDebug(PLUGIN_NAME, "ServerIntercept : Added Server intercept");
   }
 
@@ -68,9 +69,19 @@ public:
     return _request_id;
   }
 
+  void resumeIntercept();
+
+  bool
+  getOutputCompleteState()
+  {
+    return outputCompleteState;
+  }
+
 private:
   uint _request_id;
   ServerConnection *_server_conn;
+  string clientHeader, clientBody;
+  bool inputCompleteState = false, outputCompleteState = false;
 };
 }
 #endif /*_SERVER_INTERCEPT_H_*/
