@@ -44,20 +44,20 @@ void
 ServerIntercept::streamReqHeader(const string &data)
 {
   TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] headCount: %d \t_request_id:%d", __FUNCTION__, headCount++, _request_id);
-  Server::server()->writeRequestHeader(_request_id);
+  Server::server()->writeRequestHeader(_request_id, _server_conn);
 }
 void
 ServerIntercept::streamReqBody(const string &data)
 {
   TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] bodyCount: %d", __FUNCTION__, bodyCount++);
-  Server::server()->writeRequestBody(_request_id, data);
+  Server::server()->writeRequestBody(_request_id, _server_conn, data);
 }
 
 void
 ServerIntercept::handleInputComplete()
 {
   TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Count : %d \t_request_id: %d", __FUNCTION__, emptyCount++, _request_id);
-  Server::server()->writeRequestBodyComplete(_request_id);
+  Server::server()->writeRequestBodyComplete(_request_id, _server_conn);
 }
 
 void

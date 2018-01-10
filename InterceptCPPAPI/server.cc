@@ -54,8 +54,9 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   switch (event) {
   case TS_EVENT_NET_CONNECT: {
     server_connection->vc_ = (TSVConn)edata;
-
+    auto _connection_pool  = server->getConnectionPool();
     server_connection->setState(ServerConnection::INUSE);
+    _connection_pool->addConnection(server_connection);
 
     TSDebug(PLUGIN_NAME, "%s: New Connection succesful, %p", __FUNCTION__, server_connection);
     TSDebug(PLUGIN_NAME, "Connected to FCGI Server. vc_ : %p \t _contp: %p \tWriteIO.vio :%p \t ReadIO.vio :%p ",
@@ -107,12 +108,14 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_VCONN_EOS: {
     TSDebug(PLUGIN_NAME, "[%s]: EOS reached.", __FUNCTION__);
 
-    ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
-    if (intercept) {
-      TSDebug(PLUGIN_NAME, "HandlePHPConnectionEvents: EOS intercept->setResponseOutputComplete");
-      Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
-      transaction.error("Internal server error");
-    }
+    // ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
+    // if (intercept) {
+    // TSDebug(PLUGIN_NAME, "[%s]: EOS intercept->setResponseOutputComplete", __FUNCTION__);
+    //   // Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+    //   // transaction.error("Internal server error");
+    //   //intercept->setResponseOutputComplete();
+    //   //TSStatIntIncrement(InterceptGlobal::respId, 1);
+    // }
 
     server->connectionClosed(server_connection);
   } break;
@@ -185,6 +188,7 @@ Server::removeIntercept(uint request_id)
     TSMutexLock(_intecept_mutex);
     _intercept_list.erase(itr);
     TSMutexUnlock(_intecept_mutex);
+    serv_conn->releaseFCGIClient();
     serv_conn->setRequestId(0);
     TSDebug(PLUGIN_NAME, "[Server:%s] Resetting and Adding connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
             pendingReqQueue->getSize());
@@ -199,68 +203,70 @@ Server::removeIntercept(uint request_id)
 }
 
 void
-Server::writeRequestHeader(uint request_id)
+Server::writeRequestHeader(uint request_id, ServerConnection *server_conn)
 {
-  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Header: request_id: %d", __FUNCTION__, request_id);
-  ServerConnection *server_conn = getServerConnection(request_id);
+  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Header: request_id: %d, Server_conn: %p", __FUNCTION__, request_id,
+          server_conn);
+  // ServerConnection *server_conn = getServerConnection(request_id);
 
-  if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
-    FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
-    unsigned char *clientReq;
-    int reqLen = 0;
+  // if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
+  FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
+  unsigned char *clientReq;
+  int reqLen = 0;
 
-    // TODO: possibly move all this as one function in server_connection
-    fcgiRequest->createBeginRequest();
-    clientReq    = fcgiRequest->addClientRequest(reqLen);
-    bool endflag = false;
-    server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
-    return;
-  } else {
-    TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
-  }
+  // TODO: possibly move all this as one function in server_connection
+  fcgiRequest->createBeginRequest();
+  clientReq    = fcgiRequest->addClientRequest(reqLen);
+  bool endflag = false;
+  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+  //  return;
+  // } else {
+  //   TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
+  // }
 }
 
 void
-Server::writeRequestBody(uint request_id, const string &data)
+Server::writeRequestBody(uint request_id, ServerConnection *server_conn, const string &data)
 {
-  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Body: request_id: %d", __FUNCTION__, request_id);
-  ServerConnection *server_conn = getServerConnection(request_id);
+  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Body: request_id: %d,Server_conn: %p", __FUNCTION__, request_id, server_conn);
+  // ServerConnection *server_conn = getServerConnection(request_id);
 
-  if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
-    FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
+  // if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
+  FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
 
-    // TODO: possibly move all this as one function in server_connection
-    unsigned char *clientReq;
-    int reqLen            = 0;
-    fcgiRequest->postData = data;
-    fcgiRequest->postBodyChunk();
-    clientReq    = fcgiRequest->addClientRequest(reqLen);
-    bool endflag = false;
-    server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
-    return;
-  } else {
-    TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
-  }
+  // TODO: possibly move all this as one function in server_connection
+  unsigned char *clientReq;
+  int reqLen            = 0;
+  fcgiRequest->postData = data;
+  fcgiRequest->postBodyChunk();
+  clientReq    = fcgiRequest->addClientRequest(reqLen);
+  bool endflag = false;
+  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+  return;
+  // } else {
+  //   TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
+  // }
 }
 
 void
-Server::writeRequestBodyComplete(uint request_id)
+Server::writeRequestBodyComplete(uint request_id, ServerConnection *server_conn)
 {
-  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Complete: request_id: %d", __FUNCTION__, request_id);
-  ServerConnection *server_conn = getServerConnection(request_id);
-  if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
-    FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
+  TSDebug(PLUGIN_NAME, "[Server::%s] : Write Request Complete: request_id: %d,Server_conn: %p", __FUNCTION__, request_id,
+          server_conn);
+  // ServerConnection *server_conn = getServerConnection(request_id);
+  // if (server_conn && server_conn->getState() == ServerConnection::INUSE) {
+  FCGIClientRequest *fcgiRequest = server_conn->fcgiRequest();
 
-    // TODO: possibly move all this as one function in server_connection
-    unsigned char *clientReq;
-    int reqLen = 0;
-    fcgiRequest->emptyParam();
-    clientReq    = fcgiRequest->addClientRequest(reqLen);
-    bool endflag = true;
-    server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
-  } else {
-    TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
-  }
+  // TODO: possibly move all this as one function in server_connection
+  unsigned char *clientReq;
+  int reqLen = 0;
+  fcgiRequest->emptyParam();
+  bool endflag = true;
+  clientReq    = fcgiRequest->addClientRequest(reqLen);
+  server_conn->writeio.phpWrite(server_conn->vc_, server_conn->contp(), clientReq, reqLen, endflag);
+  // } else {
+  //   TSDebug(PLUGIN_NAME, "%s: Should write to buffer", __FUNCTION__);
+  // }
 }
 
 const uint
@@ -274,7 +280,7 @@ Server::connect(ServerIntercept *intercept)
   ServerConnection *conn = _connection_pool->getAvailableConnection();
   TSMutexUnlock(_conn_mutex);
 
-  if (conn != nullptr) {
+  if (conn && conn->getState() == ServerConnection::INUSE) {
     TSDebug(PLUGIN_NAME, "[Server:%s]: Connection Available...conn: %p, vc_: %p", __FUNCTION__, conn, conn->vc_);
     initiateBackendConnection(intercept, conn);
   } else {
@@ -314,6 +320,7 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   TSMutexUnlock(_reqId_mutex);
 
   intercept->setRequestId(request_id);
+  intercept->setServerConn(conn);
   conn->setRequestId(request_id);
 
   // TODO: Check better way to do it

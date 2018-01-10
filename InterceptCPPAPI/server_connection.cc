@@ -103,18 +103,16 @@ ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
 ServerConnection::~ServerConnection()
 {
   TSDebug(PLUGIN_NAME, "Destroying server Connection Obj: %p", this);
-
   if (vc_) {
-    TSDebug(PLUGIN_NAME, "Closing vc_ : %p", vc_);
     TSVConnClose(vc_);
   }
   vc_        = nullptr;
   readio.vio = writeio.vio = nullptr;
   _requestId               = 0;
-  TSDebug(PLUGIN_NAME, "Destroying _contp : %p \n\n\n", _contp);
   TSContDestroy(_contp);
   _contp = nullptr;
-  delete _fcgiRequest;
+  if (_fcgiRequest != nullptr)
+    delete _fcgiRequest;
   delete _sConnInfo;
 }
 
@@ -122,6 +120,13 @@ void
 ServerConnection::createFCGIClient(TSHttpTxn txn)
 {
   _fcgiRequest = new FCGIClientRequest(_requestId, txn);
+}
+
+void
+ServerConnection::releaseFCGIClient()
+{
+  TSDebug(PLUGIN_NAME, "[ServerConnection:%s] Release FCGI resource of Request :%d ", __FUNCTION__, _requestId);
+  delete _fcgiRequest;
 }
 
 void
