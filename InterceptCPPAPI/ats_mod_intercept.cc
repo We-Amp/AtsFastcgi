@@ -16,8 +16,6 @@
 #include "fcgi_config.h"
 #include "server_intercept.h"
 #include "server.h"
-#include "Profiler.h"
-#include <fstream>
 #include <regex>
 
 #define CONFIGURU_IMPLEMENTATION 1
@@ -69,7 +67,7 @@ public:
 //   std::cout << std::endl;
 //   path = urlMatch.suffix().str();
 // }
-#ifdef ATS_FCGI_PROFILER
+#if ATS_FCGI_PROFILER
     if (path.find("js") != string::npos) {
       std::cout << "Generating Dump file." << std::endl;
       auto p = profiler.profiles();
@@ -79,10 +77,6 @@ public:
       Config resultArr = Config::array();
 
       for (it = p.begin(); it != p.end(); it++) {
-        // std::cout << "start time: " << it->start_time() << std::endl;
-        // std::cout << "end time: " << it->end_time() << std::endl;
-        // std::cout << "thread id: " << it->thread_id() << std::endl;
-        // std::cout << "Task Name: " << it->task_name() << std::endl;
         Config cfg = Config::object();
         cfg["ts"]  = it->start_time();
         // cfg["end_time"] = it->end_time();
@@ -92,20 +86,16 @@ public:
         cfg["name"] = it->task_name();
         // cfg["id"]   = std::to_string(it->object_id());
         cfg["ph"] = it->obj_stage();
-
         resultArr.push_back(cfg);
       }
+
       // resultObj["traceEvents"] = resultArr;
       // std::string json = dump_string(resultArr, JSON);
       dump_file("/tmp/output.json", resultArr, JSON);
-      // std::ofstream example_file;
-      // example_file.open("./example.json");
-      // example_file << json;
-      // example_file.close();
     }
 #endif
     if (path.find("php") != string::npos) {
-#ifdef ATS_FCGI_PROFILER
+#if ATS_FCGI_PROFILER
       profiler.set_record_enabled(true);
       ats_plugin::ProfileTaker profile_taker(&profiler, "handleReadRequestHeaders", (std::size_t)&plugin, "B");
 #endif

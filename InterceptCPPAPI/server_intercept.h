@@ -27,6 +27,7 @@ using namespace atscppapi;
 
 namespace ats_plugin
 {
+class ServerConnection;
 class ServerIntercept : public InterceptPlugin
 {
 public:
@@ -55,6 +56,12 @@ public:
     _request_id = request_id;
   }
 
+  void
+  setServerConn(ServerConnection *conn)
+  {
+    _server_conn = conn;
+  }
+
   uint
   requestId()
   {
@@ -63,6 +70,7 @@ public:
 
 private:
   uint _request_id;
+  ServerConnection *_server_conn;
 };
 }
 #endif /*_SERVER_INTERCEPT_H_*/
