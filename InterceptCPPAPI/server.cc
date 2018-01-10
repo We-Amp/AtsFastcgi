@@ -174,7 +174,7 @@ Server::getServerConnection(uint request_id)
 void
 Server::removeIntercept(uint request_id)
 {
-#ifdef ATS_FCGI_PROFILER
+#if ATS_FCGI_PROFILER
   using namespace InterceptGlobal;
   ats_plugin::ProfileTaker profile_taker1(&profiler, "removeIntercept", (std::size_t)&gServer, "B");
 #endif
@@ -266,7 +266,7 @@ Server::writeRequestBodyComplete(uint request_id)
 const uint
 Server::connect(ServerIntercept *intercept)
 {
-#ifdef ATS_FCGI_PROFILER
+#if ATS_FCGI_PROFILER
   using namespace InterceptGlobal;
   ats_plugin::ProfileTaker profile_taker(&profiler, "connect", (std::size_t)&gServer, "B");
 #endif
@@ -288,7 +288,7 @@ Server::connect(ServerIntercept *intercept)
 void
 Server::reConnect(ServerConnection *server_conn, uint request_id)
 {
-#ifdef ATS_FCGI_PROFILER
+#if ATS_FCGI_PROFILER
   using namespace InterceptGlobal;
   ats_plugin::ProfileTaker profile_taker2(&profiler, "reConnect", (std::size_t)&gServer, "B");
 #endif

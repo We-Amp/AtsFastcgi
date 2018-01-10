@@ -69,7 +69,7 @@ public:
 //   std::cout << std::endl;
 //   path = urlMatch.suffix().str();
 // }
-#ifdef ATS_FCGI_PROFILER
+#if ATS_FCGI_PROFILER
     if (path.find("js") != string::npos) {
       std::cout << "Generating Dump file." << std::endl;
       auto p = profiler.profiles();
@@ -105,7 +105,7 @@ public:
     }
 #endif
     if (path.find("php") != string::npos) {
-#ifdef ATS_FCGI_PROFILER
+#if ATS_FCGI_PROFILER
       profiler.set_record_enabled(true);
       ats_plugin::ProfileTaker profile_taker(&profiler, "handleReadRequestHeaders", (std::size_t)&plugin, "B");
 #endif
