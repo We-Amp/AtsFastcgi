@@ -55,7 +55,7 @@ public:
   }
 
   void createFCGIClient(TSHttpTxn txn);
-
+  void releaseFCGIClient();
   FCGIClientRequest *
   fcgiRequest()
   {
