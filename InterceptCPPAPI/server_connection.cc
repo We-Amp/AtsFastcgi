@@ -22,6 +22,10 @@ InterceptIOChannel::~InterceptIOChannel()
 void
 InterceptIOChannel::read(TSVConn vc, TSCont contp)
 {
+#if ATS_FCGI_PROFILER
+  using namespace InterceptGlobal;
+  ats_plugin::ProfileTaker profile_taker3(&profiler, "phpRead", (std::size_t)&gServer, "B");
+#endif
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
@@ -50,6 +54,10 @@ InterceptIOChannel::write(TSVConn vc, TSCont contp)
 void
 InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size, bool endflag)
 {
+#if ATS_FCGI_PROFILER
+  using namespace InterceptGlobal;
+  ats_plugin::ProfileTaker profile_taker3(&profiler, "phpWrite", (std::size_t)&gServer, "B");
+#endif
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
@@ -99,10 +107,10 @@ ServerConnection::~ServerConnection()
 {
   TSDebug(PLUGIN_NAME, "Destroying server Connection Obj: %p", this);
 
-  if (vc_) {
+  if (vc_ && _state == CLOSED) {
     TSVConnClose(vc_);
+    vc_ = nullptr;
   }
-  vc_        = nullptr;
   readio.vio = writeio.vio = nullptr;
   _requestId               = 0;
   TSContDestroy(_contp);
@@ -115,14 +123,20 @@ ServerConnection::~ServerConnection()
 void
 ServerConnection::createFCGIClient(TSHttpTxn txn)
 {
-  _fcgiRequest = new FCGIClientRequest(_requestId, txn);
+  if (_state == READY || _state == COMPLETE) {
+    _fcgiRequest = new FCGIClientRequest(_requestId, txn);
+    _state       = INUSE;
+  }
 }
 
 void
 ServerConnection::releaseFCGIClient()
 {
-  TSDebug(PLUGIN_NAME, "[ServerConnection:%s] Release FCGI resource of Request :%d ", __FUNCTION__, _requestId);
-  delete _fcgiRequest;
+  if (_state == COMPLETE) {
+    TSDebug(PLUGIN_NAME, "[ServerConnection:%s] Release FCGI resource of Request :%d ", __FUNCTION__, _requestId);
+    delete _fcgiRequest;
+    _state = READY;
+  }
 }
 
 void

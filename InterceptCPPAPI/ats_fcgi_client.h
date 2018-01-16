@@ -88,7 +88,6 @@ public:
   uint32_t fcgiHeaderGetContentLen(FCGI_Header *h);
 
   uint32_t serializeNameValue(uchar *buffer, std::map<std::string, std::string>::iterator it);
-  uint32_t serializePostData(uchar *buffer, std::string str);
   unsigned char *addClientRequest(int &);
 
   // Response Decoding member functions

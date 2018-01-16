@@ -30,7 +30,7 @@ public:
   ServerConnection(Server *server, TSEventFunc funcp);
   ~ServerConnection();
 
-  enum State { INITIATED, READY, INUSE, CLOSED };
+  enum State { INITIATED, READY, INUSE, COMPLETE, CLOSED };
 
   void
   setState(State state)

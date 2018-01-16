@@ -2,7 +2,6 @@
 #define _CONNECTION_POOL_H_
 
 #include <list>
-
 #include "ts/ts.h"
 
 namespace ats_plugin
@@ -29,9 +28,10 @@ public:
 
 private:
   void createConnections();
-
+  uint _maxConn;
   Server *_server;
   TSEventFunc _funcp;
+  TSMutex _availableConn_mutex, _conn_mutex;
   std::list<ServerConnection *> _available_connections;
   std::list<ServerConnection *> _connections;
 };

@@ -27,17 +27,24 @@ using namespace atscppapi;
 
 namespace ats_plugin
 {
+class ProfileTaker;
 class ServerConnection;
 class ServerIntercept : public InterceptPlugin
 {
 public:
   int headCount = 0, bodyCount = 0, emptyCount = 0;
   TSHttpTxn _txn;
+  bool connInuse = false;
 
   ServerIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
   {
-    _server_conn = nullptr;
-    _txn         = static_cast<TSHttpTxn>(transaction.getAtsHandle());
+    _server_conn        = nullptr;
+    _txn                = static_cast<TSHttpTxn>(transaction.getAtsHandle());
+    profileTakerInput   = nullptr;
+    profileTakerOutput  = nullptr;
+    profileTakerReq     = nullptr;
+    inputCompleteState  = false;
+    outputCompleteState = false;
     TSDebug(PLUGIN_NAME, "ServerIntercept : Added Server intercept");
   }
 
@@ -81,7 +88,10 @@ private:
   uint _request_id;
   ServerConnection *_server_conn;
   string clientHeader, clientBody;
-  bool inputCompleteState = false, outputCompleteState = false;
+  bool inputCompleteState, outputCompleteState;
+
+  ProfileTaker *profileTakerInput, *profileTakerOutput, *profileTakerReq;
+  bool profInputFlag = false, profOutputFlag = false;
 };
 }
 #endif /*_SERVER_INTERCEPT_H_*/

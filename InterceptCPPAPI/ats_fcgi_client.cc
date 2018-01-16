@@ -153,6 +153,7 @@ FCGIClientRequest::emptyParam()
     state_->pBuffInc += sizeof(FCGI_Header);
   }
 }
+
 FCGI_Header *
 FCGIClientRequest::createHeader(uchar type)
 {
@@ -229,6 +230,7 @@ FCGIClientRequest::postBodyChunk()
   state_->pBuffInc += sizeof(FCGI_Header);
   TSDebug(PLUGIN_NAME, "Post Header Len: %ld ", state_->pBuffInc - state_->buff);
 }
+
 unsigned char *
 FCGIClientRequest::addClientRequest(int &dataLen)
 {
@@ -274,26 +276,6 @@ FCGIClientRequest::serializeNameValue(uchar *buffer, std::map<string, string>::i
   return p - buffer;
 }
 
-uint32_t
-FCGIClientRequest::serializePostData(uchar *buffer, std::string str)
-{
-  uchar *p = buffer;
-  uint32_t nl;
-  nl = str.length();
-  if (nl < 128)
-    *p++ = BYTE_0(nl);
-  else {
-    *p++ = BYTE_0(nl);
-    *p++ = BYTE_1(nl);
-    *p++ = BYTE_2(nl);
-    *p++ = BYTE_3(nl);
-  }
-  memcpy(p, str.c_str(), nl);
-  p += nl;
-  return p - buffer;
-  // return 0;
-}
-
 void
 FCGIClientRequest::fcgiHeaderSetRequestId(FCGI_Header *h, int request_id)
 {
@@ -311,8 +293,8 @@ FCGIClientRequest::fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len)
 uint32_t
 FCGIClientRequest::fcgiHeaderGetContentLen(FCGI_Header *h)
 {
-  TSDebug(PLUGIN_NAME, "[%s ] contentLengthB1: %d ,contentLengthB0 : %d ,After shieft content_len_hi: %d ", __FUNCTION__,
-          h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
+  // TSDebug(PLUGIN_NAME, "[%s ] contentLengthB1: %d ,contentLengthB0 : %d ,After shieft content_len_hi: %d ", __FUNCTION__,
+  //         h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
   return (h->contentLengthB1 << 8) + h->contentLengthB0;
 }
 
@@ -447,17 +429,14 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
     if (fcgiProcessRecord(&beg_buf, end_buf, _headerRecord) == FCGI_PROCESS_DONE) {
       if (_headerRecord->header->type == FCGI_STDOUT) {
         output << std::string((const char *)_headerRecord->content, _headerRecord->length);
-        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] writing to stdout stream.", __FUNCTION__);
       }
-      // TODO: If FCGI gives error response, then this needs to address well.
-      // As of now, at the cppapi level library don't provide any api which will tell client that request
-      // has aborted or failed.
       if (_headerRecord->header->type == FCGI_STDERR) {
+        output << std::string((const char *)_headerRecord->content, _headerRecord->length);
         TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response FCGI_STDERR.*****\n\n", __FUNCTION__);
         return true;
       }
       if (_headerRecord->header->type == FCGI_END_REQUEST) {
-        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response complete. FCGI_END_REQUEST.*****\n\n", __FUNCTION__);
+        // TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response complete. FCGI_END_REQUEST.*****\n\n", __FUNCTION__);
         return true;
       }
     }

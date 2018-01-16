@@ -55,12 +55,12 @@ public:
   Server(Server const &) = delete;
   void operator=(Server const &) = delete;
 
-  int checkAvailability();
   RequestQueue *pendingReqQueue;
   void reuseConnection(ServerConnection *server_conn);
   void connectionClosed(ServerConnection *server_conn);
 
   void reConnect(ServerConnection *server_conn, uint request_id);
+
   ConnectionPool *
   getConnectionPool()
   {
@@ -75,7 +75,6 @@ private:
 
   ConnectionPool *_connection_pool;
   TSMutex _reqId_mutex;
-  TSMutex _conn_mutex;
   TSMutex _intecept_mutex;
 };
 }

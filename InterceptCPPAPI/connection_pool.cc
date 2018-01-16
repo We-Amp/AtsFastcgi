@@ -1,20 +1,22 @@
-
-#include "connection_pool.h"
-
-#include "server.h"
-#include "server_connection.h"
-
-#include "ats_mod_intercept.h"
 #include "ts/ts.h"
+#include "ats_mod_intercept.h"
+#include "connection_pool.h"
+#include "server_connection.h"
+#include "server.h"
 
 using namespace ats_plugin;
-ConnectionPool::ConnectionPool(Server *server, TSEventFunc funcp) : _server(server), _funcp(funcp)
+ConnectionPool::ConnectionPool(Server *server, TSEventFunc funcp)
+  : _server(server), _funcp(funcp), _availableConn_mutex(TSMutexCreate()), _conn_mutex(TSMutexCreate())
 {
+  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
+  _maxConn                              = gConfig->getMaxConnLength();
 }
 
 ConnectionPool::~ConnectionPool()
 {
   TSDebug(PLUGIN_NAME, "Destroying connectionPool Obj...");
+  TSMutexDestroy(_availableConn_mutex);
+  TSMutexDestroy(_conn_mutex);
 }
 
 int
@@ -26,34 +28,36 @@ ConnectionPool::checkAvailability()
 ServerConnection *
 ConnectionPool::getAvailableConnection()
 {
-  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
-  uint maxConn                          = gConfig->getMaxConnLength();
-
-  if (!_available_connections.empty() && _connections.size() == maxConn) {
+  TSMutexLock(_availableConn_mutex);
+  if (!_available_connections.empty() && _connections.size() == _maxConn) {
     TSDebug(PLUGIN_NAME, "%s: available connections %ld", __FUNCTION__, _available_connections.size());
     ServerConnection *conn = _available_connections.front();
     _available_connections.pop_front();
+    TSMutexUnlock(_availableConn_mutex);
     // TODO ASSERT(conn->getState() == ServerConnection::READY)
-    conn->setState(ServerConnection::INUSE);
+    conn->setState(ServerConnection::READY);
     TSDebug(PLUGIN_NAME, "%s: Connection from available pool, %p", __FUNCTION__, conn);
     return conn;
+  } else {
+    TSMutexUnlock(_availableConn_mutex);
   }
 
-  if (_connections.size() >= maxConn) {
-    TSDebug(PLUGIN_NAME, "%s: Max conn reached, need to queue, maxConn: %d", __FUNCTION__, maxConn);
+  if (_connections.size() >= _maxConn) {
+    TSDebug(PLUGIN_NAME, "%s: Max conn reached, need to queue, maxConn: %d", __FUNCTION__, _maxConn);
     return nullptr;
   }
 
   ServerConnection *conn = new ServerConnection(_server, _funcp);
   addConnection(conn);
-  TSDebug(PLUGIN_NAME, "%s: New Connection created, %p", __FUNCTION__, conn);
   return conn;
 }
 
 void
 ConnectionPool::addConnection(ServerConnection *connection)
 {
+  TSMutexLock(_conn_mutex);
   _connections.push_back(connection);
+  TSMutexUnlock(_conn_mutex);
 }
 
 void
@@ -63,14 +67,23 @@ ConnectionPool::reuseConnection(ServerConnection *connection)
   connection->writeio.readEnable = false;
 
   connection->setState(ServerConnection::READY);
+  TSMutexLock(_availableConn_mutex);
   _available_connections.push_back(connection);
+  TSMutexUnlock(_availableConn_mutex);
+
   TSDebug(PLUGIN_NAME, "%s: Connection added, available connections %ld", __FUNCTION__, _available_connections.size());
 }
 
 void
 ConnectionPool::connectionClosed(ServerConnection *connection)
 {
+  TSMutexLock(_availableConn_mutex);
   _available_connections.remove(connection);
+  TSMutexUnlock(_availableConn_mutex);
+
+  TSMutexLock(_conn_mutex);
   _connections.remove(connection);
+  TSMutexUnlock(_conn_mutex);
+
   delete connection;
 }
