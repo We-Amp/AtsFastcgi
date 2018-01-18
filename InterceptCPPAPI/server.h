@@ -2,8 +2,10 @@
 #define __SERVER_H_
 
 #include "server_intercept.h"
+#include "request_queue.h"
 #include <map>
-
+namespace ats_plugin
+{
 class ServerIntercept;
 class ServerConnection;
 class ConnectionPool;
@@ -26,6 +28,7 @@ private:
 struct ServerConnectionInfo {
 public:
   ServerConnectionInfo(Server *fServer, ServerConnection *server_conn) : server(fServer), server_connection(server_conn) {}
+  ~ServerConnectionInfo() {}
   Server *server;
   ServerConnection *server_connection;
 };
@@ -45,19 +48,35 @@ public:
   ServerIntercept *getIntercept(uint request_id);
   void removeIntercept(uint request_id);
 
-  void writeRequestHeader(uint request_id);
-  void writeRequestBody(uint request_id, const std::string &data);
-  void writeRequestBodyComplete(uint request_id);
+  void writeRequestHeader(uint request_id, ServerConnection *serv_conn);
+  void writeRequestBody(uint request_id, ServerConnection *serv_conn, const std::string &data);
+  void writeRequestBodyComplete(uint request_id, ServerConnection *serv_conn);
 
   Server(Server const &) = delete;
   void operator=(Server const &) = delete;
 
+  int checkAvailability();
+  RequestQueue *pendingReqQueue;
+  void reuseConnection(ServerConnection *server_conn);
+  void connectionClosed(ServerConnection *server_conn);
+
+  void reConnect(ServerConnection *server_conn, uint request_id);
+  ConnectionPool *
+  getConnectionPool()
+  {
+    return _connection_pool;
+  }
+
 private:
-  void createConnections();
+  void createConnectionPool();
+  void initiateBackendConnection(ServerIntercept *intercept, ServerConnection *conn);
 
   std::map<uint, std::tuple<ServerIntercept *, ServerConnection *>> _intercept_list;
-  std::list<ServerIntercept *> pending_list;
-  ConnectionPool *_connection_pool;
-};
 
+  ConnectionPool *_connection_pool;
+  TSMutex _reqId_mutex;
+  TSMutex _conn_mutex;
+  TSMutex _intecept_mutex;
+};
+}
 #endif /*__SERVER_H_*/

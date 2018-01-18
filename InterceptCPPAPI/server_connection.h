@@ -5,24 +5,23 @@
 
 #include "ts/ts.h"
 
-class Server;
-namespace FCGIClient
+namespace ats_plugin
 {
+class Server;
 class FCGIClientRequest;
-}
-
+struct ServerConnectionInfo;
 struct InterceptIOChannel {
   TSVIO vio;
   TSIOBuffer iobuf;
   TSIOBufferReader reader;
   int total_bytes_written;
-
+  bool readEnable;
   InterceptIOChannel();
   ~InterceptIOChannel();
 
   void read(TSVConn vc, TSCont contp);
   void write(TSVConn vc, TSCont contp);
-  void phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size);
+  void phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size, bool endflag);
 };
 
 class ServerConnection
@@ -31,7 +30,7 @@ public:
   ServerConnection(Server *server, TSEventFunc funcp);
   ~ServerConnection();
 
-  enum State { INITIATED, READY, INUSE };
+  enum State { INITIATED, READY, INUSE, CLOSED };
 
   void
   setState(State state)
@@ -56,8 +55,8 @@ public:
   }
 
   void createFCGIClient(TSHttpTxn txn);
-
-  FCGIClient::FCGIClientRequest *
+  void releaseFCGIClient();
+  FCGIClientRequest *
   fcgiRequest()
   {
     return _fcgiRequest;
@@ -74,7 +73,7 @@ public:
   std::string clientData, clientRequestBody, serverResponse;
   InterceptIOChannel readio;
   InterceptIOChannel writeio;
-  FCGIClient::FCGIClientRequest *_fcgiRequest;
+  FCGIClientRequest *_fcgiRequest;
 
 private:
   void createConnection();
@@ -82,7 +81,9 @@ private:
   Server *_server;
   TSEventFunc _funcp;
   TSCont _contp;
+  ServerConnectionInfo *_sConnInfo;
   uint _requestId;
 };
+}
 
 #endif /*_SERVERCONNECTION_H_*/

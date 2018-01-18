@@ -16,22 +16,23 @@
 #include <atscppapi/utils.h>
 
 #include "ats_fcgi_client.h"
-#include "ats_fcgi_config.h"
+#include "fcgi_config.h"
 #include "server.h"
 
 using namespace atscppapi;
-
+using namespace ats_plugin;
 ServerIntercept::~ServerIntercept()
 {
-  TSDebug(PLUGIN_NAME, "~ServerIntercept : Shutting down server intercept");
+  TSDebug(PLUGIN_NAME, "~ServerIntercept : Shutting down server intercept. _request_id: %d", _request_id);
   Server::server()->removeIntercept(_request_id);
+  _txn = nullptr;
 }
 
 void
 ServerIntercept::consume(const string &data, InterceptPlugin::RequestDataType type)
 {
   if (type == InterceptPlugin::REQUEST_HEADER) {
-    cout << "Read request header data" << endl << data;
+    TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Read request header data.", __FUNCTION__);
     streamReqHeader(data);
 
   } else {
@@ -42,21 +43,21 @@ ServerIntercept::consume(const string &data, InterceptPlugin::RequestDataType ty
 void
 ServerIntercept::streamReqHeader(const string &data)
 {
-  cout << "streamReqHeader: " << headCount++ << endl;
-  Server::server()->writeRequestHeader(_request_id);
+  TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] headCount: %d \t_request_id:%d", __FUNCTION__, headCount++, _request_id);
+  Server::server()->writeRequestHeader(_request_id, _server_conn);
 }
 void
 ServerIntercept::streamReqBody(const string &data)
 {
-  cout << "streamReqBody: " << bodyCount++ << endl;
-  Server::server()->writeRequestBody(_request_id, data);
+  TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] bodyCount: %d", __FUNCTION__, bodyCount++);
+  Server::server()->writeRequestBody(_request_id, _server_conn, data);
 }
 
 void
 ServerIntercept::handleInputComplete()
 {
-  cout << "HandleInputComplete: " << emptyCount++ << endl;
-  Server::server()->writeRequestBodyComplete(_request_id);
+  TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Count : %d \t_request_id: %d", __FUNCTION__, emptyCount++, _request_id);
+  Server::server()->writeRequestBodyComplete(_request_id, _server_conn);
 }
 
 void

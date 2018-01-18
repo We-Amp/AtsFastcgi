@@ -2,7 +2,7 @@
 #define _SERVER_INTERCEPT_H_
 
 #include "ats_fcgi_client.h"
-#include "ats_fcgi_config.h"
+#include "fcgi_config.h"
 #include "atscppapi/Transaction.h"
 #include "atscppapi/TransactionPlugin.h"
 #include "ts/ink_defs.h"
@@ -22,10 +22,12 @@
 using std::cout;
 using std::endl;
 using std::string;
+
 using namespace atscppapi;
 
-using namespace FCGIClient;
-
+namespace ats_plugin
+{
+class ServerConnection;
 class ServerIntercept : public InterceptPlugin
 {
 public:
@@ -54,6 +56,12 @@ public:
     _request_id = request_id;
   }
 
+  void
+  setServerConn(ServerConnection *conn)
+  {
+    _server_conn = conn;
+  }
+
   uint
   requestId()
   {
@@ -62,6 +70,7 @@ public:
 
 private:
   uint _request_id;
+  ServerConnection *_server_conn;
 };
-
+}
 #endif /*_SERVER_INTERCEPT_H_*/
