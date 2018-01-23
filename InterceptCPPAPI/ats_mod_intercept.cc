@@ -41,15 +41,17 @@ namespace InterceptGlobal
 GlobalPlugin *plugin;
 ats_plugin::InterceptPluginData *plugin_data;
 ats_plugin::Server *gServer;
-int reqId, respId;
+int reqBegId, reqEndId, respBegId, respEndId;
 #if ATS_FCGI_PROFILER
 ats_plugin::Profiler profiler;
 #endif
 }
 
 // For experimental purpose to keep stats of plugin request/response
-const char reqName[]  = "plugin." PLUGIN_NAME ".reqCount";
-const char respName[] = "plugin." PLUGIN_NAME ".respCount";
+const char reqBegName[]  = "plugin." PLUGIN_NAME ".reqCountBeg";
+const char reqEndName[]  = "plugin." PLUGIN_NAME ".reqCountEnd";
+const char respBegName[] = "plugin." PLUGIN_NAME ".respCountBeg";
+const char respEndName[] = "plugin." PLUGIN_NAME ".respCountEnd";
 
 using namespace InterceptGlobal;
 
@@ -115,7 +117,7 @@ public:
       ats_plugin::ProfileTaker profile_taker(&profiler, "handleReadRequestHeaders", (std::size_t)&plugin, "B");
 #endif
 
-      TSStatIntIncrement(reqId, 1);
+      TSStatIntIncrement(reqBegId, 1);
       auto intercept = new ats_plugin::ServerIntercept(transaction);
       gServer->connect(intercept);
     } else {
@@ -140,33 +142,57 @@ TSPluginInit(int argc, const char *argv[])
     plugin  = new InterceptGlobalPlugin();
     gServer = new ats_plugin::Server();
 
-    if (TSStatFindName(reqName, &reqId) == TS_ERROR) {
-      reqId = TSStatCreate(reqName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      if (reqId == TS_ERROR) {
-        TSError("[%s] failed to register '%s'", PLUGIN_NAME, reqName);
+    if (TSStatFindName(reqBegName, &reqBegId) == TS_ERROR) {
+      reqBegId = TSStatCreate(reqBegName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+      if (reqBegId == TS_ERROR) {
+        TSError("[%s] failed to register '%s'", PLUGIN_NAME, reqBegName);
         return;
       }
     }
 
-    TSError("[%s] %s registered with id %d", PLUGIN_NAME, reqName, reqId);
+    TSError("[%s] %s registered with id %d", PLUGIN_NAME, reqBegName, reqBegId);
 
-    if (TSStatFindName(respName, &respId) == TS_ERROR) {
-      respId = TSStatCreate(respName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
-      if (respId == TS_ERROR) {
-        TSError("[%s] failed to register '%s'", PLUGIN_NAME, respName);
+    if (TSStatFindName(reqEndName, &reqEndId) == TS_ERROR) {
+      reqEndId = TSStatCreate(reqEndName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+      if (reqEndId == TS_ERROR) {
+        TSError("[%s] failed to register '%s'", PLUGIN_NAME, reqEndName);
         return;
       }
     }
 
-    TSError("[%s] %s registered with id %d", PLUGIN_NAME, respName, respId);
+    TSError("[%s] %s registered with id %d", PLUGIN_NAME, reqEndName, reqEndId);
+
+    if (TSStatFindName(respBegName, &respBegId) == TS_ERROR) {
+      respBegId = TSStatCreate(respBegName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+      if (respBegId == TS_ERROR) {
+        TSError("[%s] failed to register '%s'", PLUGIN_NAME, respBegName);
+        return;
+      }
+    }
+
+    TSError("[%s] %s registered with id %d", PLUGIN_NAME, respBegName, respBegId);
+
+    if (TSStatFindName(respEndName, &respEndId) == TS_ERROR) {
+      respEndId = TSStatCreate(respEndName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+      if (respEndId == TS_ERROR) {
+        TSError("[%s] failed to register '%s'", PLUGIN_NAME, respEndName);
+        return;
+      }
+    }
+
+    TSError("[%s] %s registered with id %d", PLUGIN_NAME, respEndName, respEndId);
 
 #if DEBUG
-    TSReleaseAssert(reqId != TS_ERROR);
-    TSReleaseAssert(respId != TS_ERROR);
+    TSReleaseAssert(reqBegId != TS_ERROR);
+    TSReleaseAssert(reqEndId != TS_ERROR);
+    TSReleaseAssert(respBegId != TS_ERROR);
+    TSReleaseAssert(respEndId != TS_ERROR);
 #endif
     // Set an initial value for our statistic.
-    TSStatIntSet(reqId, 0);
-    TSStatIntSet(respId, 0);
+    TSStatIntSet(reqBegId, 0);
+    TSStatIntSet(reqEndId, 0);
+    TSStatIntSet(respBegId, 0);
+    TSStatIntSet(respEndId, 0);
 
   } else {
     TSDebug(PLUGIN_NAME, " plugin is disabled.");

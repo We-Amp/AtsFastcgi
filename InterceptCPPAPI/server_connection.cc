@@ -135,7 +135,8 @@ ServerConnection::releaseFCGIClient()
   if (_state == COMPLETE) {
     TSDebug(PLUGIN_NAME, "[ServerConnection:%s] Release FCGI resource of Request :%d ", __FUNCTION__, _requestId);
     delete _fcgiRequest;
-    _state = READY;
+    _fcgiRequest = nullptr;
+    _state       = READY;
   }
 }
 

@@ -42,7 +42,7 @@ public:
     _txn                = static_cast<TSHttpTxn>(transaction.getAtsHandle());
     profileTakerInput   = nullptr;
     profileTakerOutput  = nullptr;
-    profileTakerReq     = nullptr;
+    outputToDest        = nullptr;
     inputCompleteState  = false;
     outputCompleteState = false;
     TSDebug(PLUGIN_NAME, "ServerIntercept : Added Server intercept");
@@ -90,7 +90,7 @@ private:
   string clientHeader, clientBody;
   bool inputCompleteState, outputCompleteState;
 
-  ProfileTaker *profileTakerInput, *profileTakerOutput, *profileTakerReq;
+  ProfileTaker *profileTakerInput, *profileTakerOutput, *outputToDest;
   bool profInputFlag = false, profOutputFlag = false;
 };
 }

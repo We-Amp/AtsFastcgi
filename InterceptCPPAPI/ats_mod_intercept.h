@@ -23,7 +23,7 @@ extern GlobalPlugin *plugin;
 extern ats_plugin::InterceptPluginData *plugin_data;
 // TODO (Rakesh): Move to FCGI connect file
 extern ats_plugin::Server *gServer;
-extern int reqId, respId;
+extern int reqBegId, reqEndId, respBegId, respEndId;
 #ifdef ATS_FCGI_PROFILER
 extern ats_plugin::Profiler profiler;
 #endif

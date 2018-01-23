@@ -26,8 +26,13 @@ using namespace ats_plugin;
 ServerIntercept::~ServerIntercept()
 {
   TSDebug(PLUGIN_NAME, "~ServerIntercept : Shutting down server intercept. _request_id: %d", _request_id);
-  Server::server()->removeIntercept(_request_id);
+  if (outputToDest != nullptr) {
+    delete outputToDest;
+    outputToDest = nullptr;
+  }
+  // Server::server()->removeIntercept(_request_id);
   _txn = nullptr;
+  TSStatIntIncrement(InterceptGlobal::respEndId, 1);
 }
 
 void
@@ -127,4 +132,9 @@ ServerIntercept::setResponseOutputComplete()
 #endif
   InterceptPlugin::setOutputComplete();
   outputCompleteState = true;
+  Server::server()->removeIntercept(_request_id);
+#if ATS_FCGI_PROFILER
+  using namespace InterceptGlobal;
+  outputToDest = new ProfileTaker(&profiler, "RespOutputToDestructorCall", (std::size_t)&gServer, "B");
+#endif
 }

@@ -87,7 +87,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
     server_connection->setState(ServerConnection::COMPLETE);
     intercept->setResponseOutputComplete();
-    TSStatIntIncrement(InterceptGlobal::respId, 1);
+    TSStatIntIncrement(InterceptGlobal::respBegId, 1);
   } break;
 
   case TS_EVENT_VCONN_WRITE_READY: {
@@ -99,6 +99,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_WRITE_COMPLETE: {
     TSDebug(PLUGIN_NAME, "[%s]: Start Reading from Server now...", __FUNCTION__);
+    TSStatIntIncrement(InterceptGlobal::reqEndId, 1);
     server_connection->readio.read(server_connection->vc_, server_connection->contp());
   } break;
 
@@ -278,7 +279,7 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
 {
   Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
   transaction.addPlugin(intercept);
-
+  transaction.resume();
 #if ATS_FCGI_PROFILER
   using namespace InterceptGlobal;
   ats_plugin::ProfileTaker profile_taker2(&profiler, "initiateBackendConnection", (std::size_t)&gServer, "B");
@@ -307,9 +308,9 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   } else {
     intercept->setServerConn(conn);
     conn->createFCGIClient(intercept->_txn);
+    if (intercept->connInuse)
+      intercept->resumeIntercept();
   }
-
-  transaction.resume();
 }
 
 void
