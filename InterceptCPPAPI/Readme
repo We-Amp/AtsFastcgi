@@ -20,13 +20,28 @@ Extract the file and set the flag  "C_Cpp.clang_format_path" to file path.
 -----------------------------------------------------------------------------
 Build and Install cmd = 
 
-#building CPP ats_mod_fcgi.so
-/home/rahul/GDBTech/ATS/opt/ts-7.1/bin/tsxs -o ats_mod_fcgi.so -c ats_mod_fcgi.cc
-  -L /home/rahul/GDBTech/ATS/opt/ts-7.1/lib/ 
-  -I /home/rahul/GDBTech/ATS/trafficserver-7.1.1/lib 
-  -I /home/rahul/GDBTech/ATS/trafficserver-7.1.1/lib/cppapi/include/ 
-  -c fcgi_intercept.cc -latscppapi 
-  && sudo /home/rahul/GDBTech/ATS/opt/ts-7.1/bin/tsxs -o ats_mod_fcgi.so  -i
+#building CPP ats_mod_intercept.so
+
+```bash
+set -e
+
+# Update the path below for your system
+ats_dir="/path/to/trafficserver-source/"
+
+tsxs -o ats_mod_intercept.so \
+     -c ats_mod_intercept.cc \
+     -L "${ats_dir}lib/" \
+     -I "${ats_dir}lib" \
+     -I "${ats_dir}lib/cppapi/include/" \
+     -c ats_fcgi_client.cc \
+     -latscppapi
+
+# Remember the tsxs path here and use it below
+# (for the case where the sudo context doesn't know about tsxs)
+mtsxs=$(which tsxs)
+
+sudo $mtsxs -o ats_mod_intercept.so  -i 
+```
 
 OR Build and install using Makefile utility:
   Before doing make Plz set below directories.
