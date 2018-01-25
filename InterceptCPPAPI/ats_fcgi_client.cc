@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <locale>
 #include <ts/ts.h>
 #include <map>
 #include <iterator>
@@ -49,6 +50,7 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
   state_->request_id_    = request_id;
   state_->requestHeaders = GenerateFcgiRequestHeaders();
   // TODO Call printFCGIRequestHeaders() to printFCGIHeaders
+  printFCGIRequestHeaders();
   string str("POST"), value;
   if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
     Transaction &transaction = utils::internal::getTransaction(state_->txn_);
@@ -101,28 +103,42 @@ FCGIClientRequest::GenerateFcgiRequestHeaders()
     atscppapi::header_field_iterator it = h.begin();
     for (it = h.begin(); it != h.end(); ++it) {
       atscppapi::HeaderField hf(*it);
+      // std::cout << "Name => " << hf.name() << "Value => " << hf.values() << std::endl;
+      std::string str = hf.name().c_str();
+      // if (str.compare("Host") == 0) {
+      std::string http("HTTP_");
+      std::locale loc;
+
+      for (std::string::size_type i = 0; i < str.length(); ++i) {
+        // std::cout << std::toupper(str[i], loc);
+        http += std::toupper(str[i], loc);
+      }
+      // std::cout << "\nName => " << http << "Value => " << hf.values() << std::endl;
+      fcgiReqHeader[http] = hf.values();
+      // break;
+      //}
     }
   }
+
   fcgiReqHeader["DOCUMET_ROOT"]      = InterceptGlobal::plugin_data->getGlobalConfigObj()->getDocumentRootDir();
   fcgiReqHeader["SCRIPT_FILENAME"]   = fcgiReqHeader["DOCUMET_ROOT"] + transaction.getClientRequest().getUrl().getPath();
   fcgiReqHeader["GATEWAY_INTERFACE"] = "FastCGI/1.1";
   fcgiReqHeader["REQUEST_METHOD"]    = HTTP_METHOD_STRINGS[transaction.getClientRequest().getMethod()];
-  fcgiReqHeader["SCRIPT_NAME"]       = transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["SCRIPT_NAME"]       = "/" + transaction.getClientRequest().getUrl().getPath();
   fcgiReqHeader["QUERY_STRING"]      = transaction.getClientRequest().getUrl().getQuery();
-  fcgiReqHeader["REQUEST_URI"]       = transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["REQUEST_URI"]       = "/" + transaction.getClientRequest().getUrl().getPath();
 
   // TODO map fcgiconfig with request headers.
   // atsfcgiconfig::FCGIParams *params      = fcgiGlobal::plugin_data->getGlobalConfigObj()->getFcgiParams();
   // atsfcgiconfig::FCGIParams::iterator it = params->begin();
   // for (it = params->begin(); it != params->end(); ++it)
   //   cout << it->first << " => " << it->second << endl;
-
-  // fcgiReqHeader["SERVER_SOFTWARE"]   = "ATS 7.1.1";
-  // fcgiReqHeader["REMOTE_ADDR"]       = "127.0.0.1";
-  // fcgiReqHeader["REMOTE_PORT"]       = "";
-  // fcgiReqHeader["SERVER_ADDR"]       = "127.0.0.1";
-  // fcgiReqHeader["SERVER_PORT"]       = "60000";
-  // fcgiReqHeader["SERVER_NAME"]       = "ATS 7.1.1";
+  fcgiReqHeader["SERVER_SOFTWARE"] = "ATS 7.1.1";
+  fcgiReqHeader["REMOTE_ADDR"]     = "127.0.0.1";
+  fcgiReqHeader["REMOTE_PORT"]     = "8090";
+  fcgiReqHeader["SERVER_ADDR"]     = "127.0.0.1";
+  fcgiReqHeader["SERVER_PORT"]     = "60000";
+  fcgiReqHeader["SERVER_NAME"]     = "ATS 7.1.1";
   fcgiReqHeader["SERVER_PROTOCOL"] = "HTTP/1.1";
   // fcgiReqHeader["CONTENT_TYPE"]      = "application/x-www-form-urlencoded";
   fcgiReqHeader["FCGI_ROLE"] = "RESPONDER";
