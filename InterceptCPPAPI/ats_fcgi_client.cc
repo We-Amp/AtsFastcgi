@@ -271,19 +271,19 @@ FCGIClientRequest::serializeNameValue(uchar *buffer, std::map<string, string>::i
   if (nl < 128) {
     *p++ = BYTE_0(nl);
   } else {
-    *p++ = BYTE_0(nl);
-    *p++ = BYTE_1(nl);
-    *p++ = BYTE_2(nl);
     *p++ = BYTE_3(nl);
+    *p++ = BYTE_2(nl);
+    *p++ = BYTE_1(nl);
+    *p++ = BYTE_0(nl);
   }
 
   if (vl < 128) {
     *p++ = BYTE_0(vl);
   } else {
-    *p++ = BYTE_0(vl);
-    *p++ = BYTE_1(vl);
-    *p++ = BYTE_2(vl);
     *p++ = BYTE_3(vl);
+    *p++ = BYTE_2(vl);
+    *p++ = BYTE_1(vl);
+    *p++ = BYTE_0(vl);
   }
   memcpy(p, it->first.c_str(), nl);
   p += nl;

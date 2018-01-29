@@ -16,7 +16,7 @@
 #define BYTE_0(x) ((x)&0xff)
 #define BYTE_1(x) ((x) >> 8 & 0xff)
 #define BYTE_2(x) ((x) >> 16 & 0xff)
-#define BYTE_3(x) ((x) >> 24 & 0xff)
+#define BYTE_3(x) ((x) >> 24 | 0x80)
 
 typedef unsigned char uchar;
 
