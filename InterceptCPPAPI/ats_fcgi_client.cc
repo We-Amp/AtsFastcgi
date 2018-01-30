@@ -51,7 +51,7 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
   state_->requestHeaders = GenerateFcgiRequestHeaders();
   // TODO Call printFCGIRequestHeaders() to printFCGIHeaders
   printFCGIRequestHeaders();
-  string str("POST"), value;
+  string str("POST");
   if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
     Transaction &transaction = utils::internal::getTransaction(state_->txn_);
     Headers &h               = transaction.getClientRequest().getHeaders();
@@ -59,16 +59,19 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
     if (h.isInitialized()) {
       string key("Content-Length");
       atscppapi::header_field_iterator it = h.find(key);
-      atscppapi::HeaderField hf(*it);
-      value                                    = hf.values(value);
-      state_->requestHeaders["CONTENT_LENGTH"] = value.c_str();
-      // TODO atscppapi::header_field_value_iterator hfv = hf.begin();
+      if (it != h.end()) {
+        atscppapi::HeaderField hf(*it);
+        string value                                    = hf.values(","); // delimeter for header values
+        state_->requestHeaders["CONTENT_LENGTH"] = value.c_str();
+      }
+
       key = string("Content-type");
       it  = h.find(key);
-      HeaderField hf1(*it);
-      value                                  = "";
-      value                                  = hf1.values(value);
-      state_->requestHeaders["CONTENT_TYPE"] = value.c_str();
+      if (it != h.end()) {
+        HeaderField hf1(*it);
+        string value                                  = hf1.values(","); // delimeter for header values
+        state_->requestHeaders["CONTENT_TYPE"] = value.c_str();
+      }
     }
 
     int contentLength = 0;
