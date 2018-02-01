@@ -64,19 +64,19 @@ public:
   {
     string path = transaction.getClientRequest().getUrl().getPath();
 
-    std::cout << "URL Path:" << path << std::endl;
+    // std::cout << "URL Path:" << path << std::endl;
     // TODO: Regex based url selection
     std::smatch urlMatch;
-    std::regex e(".*.[wp*|php|js|css|scss|png|gif](p{2})?");
+    // std::regex e(".*.[wp*|php|js|css|scss|png|gif](p{2})?");
+    std::regex e(".*");
     while (std::regex_search(path, urlMatch, e)) {
       for (auto x : urlMatch)
-        std::cout << x << " ";
-      std::cout << std::endl;
+        std::cout << x << " " << std::endl;
       // path = urlMatch.suffix().str();
       // std::cout << "Path:" << path << std::endl;
       break;
     }
-    std::cout << "UrlMatch" << urlMatch.str() << std::endl;
+    // std::cout << "UrlMatch" << urlMatch.str() << std::endl;
     // #if ATS_FCGI_PROFILER
     //     // Intentionally written this piece of code to record profiler stats in a file.
     //     if (path.find("_profilerStats") != string::npos) {

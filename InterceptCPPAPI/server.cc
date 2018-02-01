@@ -24,6 +24,7 @@ interceptTransferData(ServerIntercept *intercept, ServerConnection *server_conn)
     int64_t remain = 0;
     const char *ptr;
     ptr = TSIOBufferBlockReadStart(block, server_conn->readio.reader, &remain);
+
     if (remain) {
       responseStatus = server_conn->fcgiRequest()->fcgiDecodeRecordChunk((uchar *)ptr, remain, output);
     }
@@ -37,6 +38,7 @@ interceptTransferData(ServerIntercept *intercept, ServerConnection *server_conn)
   TSVIONDoneSet(server_conn->readio.vio, TSVIONDoneGet(server_conn->readio.vio) + consumed);
 
   std::string data = std::move(output.str());
+  // std::cout << "Output: " << data << std::endl;
   intercept->writeResponseChunkToATS(data);
   return responseStatus;
 }
@@ -122,6 +124,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
       TSDebug(PLUGIN_NAME, "[%s]:ERROR  intercept->setResponseOutputComplete", __FUNCTION__);
       server_connection->setState(ServerConnection::CLOSED);
       Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+      transaction.setStatusCode(HTTP_STATUS_BAD_GATEWAY);
       transaction.error("Internal server error");
     }
 
@@ -179,16 +182,30 @@ Server::removeIntercept(uint request_id)
     TSMutexUnlock(_intecept_mutex);
 
     serv_conn->releaseFCGIClient();
-    serv_conn->setRequestId(0);
     TSDebug(PLUGIN_NAME, "[Server:%s] Reset and Add connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
             pendingReqQueue->getSize());
-    _connection_pool->reuseConnection(serv_conn);
-  }
-
-  if (!pendingReqQueue->isQueueEmpty()) {
-    ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
-    TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
-    connect(intercept);
+    if (serv_conn->requestCount() < serv_conn->maxRequests()) {
+      if (!pendingReqQueue->isQueueEmpty()) {
+        ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
+        TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
+        initiateBackendConnection(intercept, serv_conn);
+      } else {
+        TSDebug(PLUGIN_NAME, "[Server:%s] Queue Empty. Reusing connection.Max_req: %d ,Req_count: %d", __FUNCTION__,
+                serv_conn->maxRequests(), serv_conn->requestCount());
+        _connection_pool->reuseConnection(serv_conn);
+      }
+    } else {
+      // destroy the connection and setup new conn to process pending list
+      TSDebug(PLUGIN_NAME, "[Server:%s] Max Requests reached. Max_req: %d ,Req_count: %d", __FUNCTION__, serv_conn->maxRequests(),
+              serv_conn->requestCount());
+      serv_conn->setState(ServerConnection::CLOSED);
+      connectionClosed(serv_conn);
+      if (!pendingReqQueue->isQueueEmpty()) {
+        TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
+        ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
+        connect(intercept);
+      }
+    }
   }
 }
 
@@ -243,10 +260,10 @@ Server::connect(ServerIntercept *intercept)
 {
   ServerConnection *conn = nullptr;
   {
-#if ATS_FCGI_PROFILER
-    using namespace InterceptGlobal;
-    ats_plugin::ProfileTaker profile_taker1(&profiler, "connectConn", (std::size_t)&gServer, "B");
-#endif
+    // #if ATS_FCGI_PROFILER
+    //     using namespace InterceptGlobal;
+    //     ats_plugin::ProfileTaker profile_taker1(&profiler, "connectConn", (std::size_t)&gServer, "B");
+    // #endif
 
     conn = _connection_pool->getAvailableConnection();
   }
@@ -280,10 +297,10 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
   transaction.addPlugin(intercept);
   transaction.resume();
-#if ATS_FCGI_PROFILER
-  using namespace InterceptGlobal;
-  ats_plugin::ProfileTaker profile_taker2(&profiler, "initiateBackendConnection", (std::size_t)&gServer, "B");
-#endif
+  // #if ATS_FCGI_PROFILER
+  //   using namespace InterceptGlobal;
+  //   ats_plugin::ProfileTaker profile_taker2(&profiler, "initiateBackendConnection", (std::size_t)&gServer, "B");
+  // #endif
 
   TSMutexLock(_reqId_mutex);
   const uint request_id = UniqueRequesID::getNext();
@@ -292,10 +309,10 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   intercept->setRequestId(request_id);
   conn->setRequestId(request_id);
   {
-#if ATS_FCGI_PROFILER
-    using namespace InterceptGlobal;
-    ats_plugin::ProfileTaker profile_taker3(&profiler, "connectInterceptList", (std::size_t)&gServer, "B");
-#endif
+    // #if ATS_FCGI_PROFILER
+    //     using namespace InterceptGlobal;
+    //     ats_plugin::ProfileTaker profile_taker3(&profiler, "connectInterceptList", (std::size_t)&gServer, "B");
+    // #endif
 
     TSMutexLock(_intecept_mutex);
     _intercept_list[request_id] = std::make_tuple(intercept, conn);

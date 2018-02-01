@@ -23,6 +23,7 @@ typedef enum {
   fcgiDocumentRoot,
   fcgiMinConnections,
   fcgiMaxConnections,
+  fcgiMaxRequests,
   fcgiRequestQueueSize
 } FcgiConfigKey;
 typedef enum {
@@ -57,7 +58,7 @@ class FcgiPluginConfig
   TSMgmtString include;
   FCGIParams *params;
   TSMgmtString document_root;
-  TSMgmtInt min_connections, max_connections, request_queue_size;
+  TSMgmtInt min_connections, max_connections, max_requests, request_queue_size;
 
 public:
   FcgiPluginConfig()
@@ -70,6 +71,7 @@ public:
       document_root(nullptr),
       min_connections(0),
       max_connections(0),
+      max_requests(0),
       request_queue_size(0)
   {
   }
@@ -83,6 +85,7 @@ public:
     document_root      = nullptr;
     min_connections    = 0;
     max_connections    = 0;
+    max_requests       = 0;
     request_queue_size = 0;
   }
 
@@ -106,6 +109,8 @@ public:
   void setMinConnLength(int64_t minLen);
   TSMgmtInt getMaxConnLength();
   void setMaxConnLength(int64_t maxLen);
+  TSMgmtInt getMaxReqLength();
+  void setMaxReqLength(int64_t maxLen);
   TSMgmtInt getRequestQueueSize();
   void setRequestQueueSize(int64_t queueSize);
 };

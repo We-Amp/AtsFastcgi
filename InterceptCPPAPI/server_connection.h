@@ -37,6 +37,7 @@ public:
   {
     _state = state;
   }
+
   State
   getState()
   {
@@ -48,10 +49,23 @@ public:
   {
     _requestId = requestId;
   }
+
   uint
   requestId()
   {
     return _requestId;
+  }
+
+  uint
+  maxRequests()
+  {
+    return _max_requests;
+  }
+
+  uint
+  requestCount()
+  {
+    return _req_count;
   }
 
   void createFCGIClient(TSHttpTxn txn);
@@ -82,7 +96,7 @@ private:
   TSEventFunc _funcp;
   TSCont _contp;
   ServerConnectionInfo *_sConnInfo;
-  uint _requestId;
+  uint _requestId, _max_requests, _req_count;
 };
 }
 

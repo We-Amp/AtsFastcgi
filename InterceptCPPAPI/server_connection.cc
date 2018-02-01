@@ -22,10 +22,10 @@ InterceptIOChannel::~InterceptIOChannel()
 void
 InterceptIOChannel::read(TSVConn vc, TSCont contp)
 {
-#if ATS_FCGI_PROFILER
-  using namespace InterceptGlobal;
-  ats_plugin::ProfileTaker profile_taker3(&profiler, "phpRead", (std::size_t)&gServer, "B");
-#endif
+  // #if ATS_FCGI_PROFILER
+  //   using namespace InterceptGlobal;
+  //   ats_plugin::ProfileTaker profile_taker3(&profiler, "phpRead", (std::size_t)&gServer, "B");
+  // #endif
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
@@ -54,10 +54,10 @@ InterceptIOChannel::write(TSVConn vc, TSCont contp)
 void
 InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size, bool endflag)
 {
-#if ATS_FCGI_PROFILER
-  using namespace InterceptGlobal;
-  ats_plugin::ProfileTaker profile_taker3(&profiler, "phpWrite", (std::size_t)&gServer, "B");
-#endif
+  // #if ATS_FCGI_PROFILER
+  //   using namespace InterceptGlobal;
+  //   ats_plugin::ProfileTaker profile_taker3(&profiler, "phpWrite", (std::size_t)&gServer, "B");
+  // #endif
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
@@ -98,8 +98,12 @@ ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
     _funcp(funcp),
     _contp(nullptr),
     _sConnInfo(nullptr),
-    _requestId(0)
+    _requestId(0),
+    _max_requests(0),
+    _req_count(0)
 {
+  ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
+  _max_requests                         = gConfig->getMaxReqLength() - 1;
   // createConnection();
 }
 
@@ -113,6 +117,8 @@ ServerConnection::~ServerConnection()
   }
   readio.vio = writeio.vio = nullptr;
   _requestId               = 0;
+  _max_requests            = 0;
+  _req_count               = 0;
   TSContDestroy(_contp);
   _contp = nullptr;
   if (_fcgiRequest != nullptr)
@@ -126,6 +132,7 @@ ServerConnection::createFCGIClient(TSHttpTxn txn)
   if (_state == READY || _state == COMPLETE) {
     _fcgiRequest = new FCGIClientRequest(_requestId, txn);
     _state       = INUSE;
+    _req_count++;
   }
 }
 

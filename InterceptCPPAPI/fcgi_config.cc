@@ -15,6 +15,7 @@ static char DEFAULT_DOCUMENT_ROOT[] = "/var/www/html/";
 
 static int DEFAULT_MIN_CONNECTION     = 4;
 static int DEFAULT_MAX_CONNECTION     = 10;
+static int DEFAULT_MAX_REQUEST        = 1000;
 static int DEFAULT_REQUEST_QUEUE_SIZE = 250;
 using namespace ats_plugin;
 inline TSRecordDataType
@@ -126,6 +127,19 @@ FcgiPluginConfig::setMaxConnLength(int64_t maxLen)
 {
   max_connections = maxLen;
 }
+
+TSMgmtInt
+FcgiPluginConfig::getMaxReqLength()
+{
+  return max_requests;
+}
+
+void
+FcgiPluginConfig::setMaxReqLength(int64_t maxLen)
+{
+  max_requests = maxLen;
+}
+
 TSMgmtInt
 FcgiPluginConfig::getRequestQueueSize()
 {
@@ -186,6 +200,11 @@ fcgiHttpTxnConfigFind(const char *name, int length, FcgiConfigKey *conf, TSRecor
   }
   if (!strncmp(name, "proxy.config.http.fcgi.host.max_connections", length)) {
     *conf = fcgiMaxConnections;
+    *type = TS_RECORDDATATYPE_INT;
+    return TS_SUCCESS;
+  }
+  if (!strncmp(name, "proxy.config.http.fcgi.host.max_requests", length)) {
+    *conf = fcgiMaxRequests;
     *type = TS_RECORDDATATYPE_INT;
     return TS_SUCCESS;
   }
@@ -522,6 +541,7 @@ FcgiPluginConfig::initConfig(const char *fn)
     config->params             = new FCGIParams();
     config->max_connections    = DEFAULT_MAX_CONNECTION;
     config->min_connections    = DEFAULT_MIN_CONNECTION;
+    config->max_requests       = DEFAULT_MAX_REQUEST;
     config->request_queue_size = DEFAULT_REQUEST_QUEUE_SIZE;
   } else {
     // Inherit from global config
@@ -535,6 +555,7 @@ FcgiPluginConfig::initConfig(const char *fn)
     config->document_root           = TSstrdup(global_config->getDocumentRootDir());
     config->max_connections         = global_config->getMaxConnLength();
     config->min_connections         = global_config->getMinConnLength();
+    config->max_requests            = global_config->getMaxReqLength();
     config->request_queue_size      = global_config->getRequestQueueSize();
   }
 
@@ -695,6 +716,10 @@ FcgiPluginConfig::initConfig(const char *fn)
           case fcgiMaxConnections: {
             config->max_connections = strtoll(tok, nullptr, 10);
             TSDebug(PLUGIN_NAME, "max_connections = %ld", config->max_connections);
+          } break;
+          case fcgiMaxRequests: {
+            config->max_requests = strtoll(tok, nullptr, 10);
+            TSDebug(PLUGIN_NAME, "max_requests = %ld", config->max_requests);
           } break;
           case fcgiRequestQueueSize: {
             config->request_queue_size = strtoll(tok, nullptr, 10);

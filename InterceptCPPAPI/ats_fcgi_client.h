@@ -49,14 +49,18 @@ struct FCGIClientState;
 
 struct FCGIRecordList {
   FCGI_Header *header;
+  FCGI_EndRequestBody *endBody;
   uchar *content;
   FCGI_State state;
+
   size_t length, offset;
 
   FCGIRecordList() : content(nullptr), state(FCGI_State::fcgi_state_version), length(0), offset(0)
   {
     header = (FCGI_Header *)TSmalloc(sizeof(FCGI_Header));
     memset(header, 0, sizeof(FCGI_Header));
+    endBody = (FCGI_EndRequestBody *)TSmalloc(sizeof(FCGI_EndRequestBody));
+    memset(endBody, 0, sizeof(FCGI_EndRequestBody));
   };
 
   ~FCGIRecordList()
@@ -86,7 +90,6 @@ public:
   void fcgiHeaderSetRequestId(FCGI_Header *h, int request_id);
   void fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len);
   uint32_t fcgiHeaderGetContentLen(FCGI_Header *h);
-
   uint32_t serializeNameValue(uchar *buffer, std::map<std::string, std::string>::iterator it);
   unsigned char *addClientRequest(int &);
 

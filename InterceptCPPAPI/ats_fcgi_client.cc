@@ -50,9 +50,10 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
   state_->request_id_    = request_id;
   state_->requestHeaders = GenerateFcgiRequestHeaders();
   // TODO Call printFCGIRequestHeaders() to printFCGIHeaders
-  printFCGIRequestHeaders();
-  string str("POST");
+  // printFCGIRequestHeaders();
+  string str("POST"), value;
   if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
+    std::cout << "Inside Post" << std::endl;
     Transaction &transaction = utils::internal::getTransaction(state_->txn_);
     Headers &h               = transaction.getClientRequest().getHeaders();
 
@@ -61,7 +62,7 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
       atscppapi::header_field_iterator it = h.find(key);
       if (it != h.end()) {
         atscppapi::HeaderField hf(*it);
-        string value                                    = hf.values(","); // delimeter for header values
+        string value                             = hf.values(","); // delimeter for header values
         state_->requestHeaders["CONTENT_LENGTH"] = value.c_str();
       }
 
@@ -69,7 +70,7 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
       it  = h.find(key);
       if (it != h.end()) {
         HeaderField hf1(*it);
-        string value                                  = hf1.values(","); // delimeter for header values
+        string value                           = hf1.values(","); // delimeter for header values
         state_->requestHeaders["CONTENT_TYPE"] = value.c_str();
       }
     }
@@ -390,6 +391,7 @@ FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecor
     cpy_len = nb;
   }
 
+  //  printf("\nCpyLen: %d", cpy_len);
   memcpy(rec->content + offset, *beg_buf, cpy_len);
 
   if (tot_len <= nb) {
@@ -432,6 +434,81 @@ FCGIClientRequest::fcgiProcessRecord(uchar **beg_buf, uchar *end_buf, FCGIRecord
   return fcgiProcessContent(beg_buf, end_buf, rec);
 }
 
+static char *
+convert_mime_hdr_to_string(TSMBuffer bufp, TSMLoc hdr_loc)
+{
+  TSIOBuffer output_buffer;
+  TSIOBufferReader reader;
+  int64_t total_avail;
+
+  TSIOBufferBlock block;
+  const char *block_start;
+  int64_t block_avail;
+
+  char *output_string;
+  int output_len;
+
+  output_buffer = TSIOBufferCreate();
+
+  if (!output_buffer) {
+    TSError("[InkAPITest] couldn't allocate IOBuffer");
+  }
+
+  reader = TSIOBufferReaderAlloc(output_buffer);
+
+  /* This will print  just MIMEFields and not
+     the http request line */
+  TSMimeHdrPrint(bufp, hdr_loc, output_buffer);
+
+  /* Find out how the big the complete header is by
+     seeing the total bytes in the buffer.  We need to
+     look at the buffer rather than the first block to
+     see the size of the entire header */
+  total_avail = TSIOBufferReaderAvail(reader);
+
+  /* Allocate the string with an extra byte for the string
+     terminator */
+  output_string = (char *)TSmalloc(total_avail + 1);
+  output_len    = 0;
+
+  /* We need to loop over all the buffer blocks to make
+     sure we get the complete header since the header can
+     be in multiple blocks */
+  block = TSIOBufferReaderStart(reader);
+  while (block) {
+    block_start = TSIOBufferBlockReadStart(block, reader, &block_avail);
+
+    /* We'll get a block pointer back even if there is no data
+       left to read so check for this condition and break out of
+       the loop. A block with no data to read means we've exhausted
+       buffer of data since if there was more data on a later
+       block in the chain, this block would have been skipped over */
+    if (block_avail == 0) {
+      break;
+    }
+
+    memcpy(output_string + output_len, block_start, block_avail);
+    output_len += block_avail;
+
+    /* Consume the data so that we get to the next block */
+    TSIOBufferReaderConsume(reader, block_avail);
+
+    /* Get the next block now that we've consumed the
+       data off the last block */
+    block = TSIOBufferReaderStart(reader);
+  }
+
+  /* Terminate the string */
+  output_string[output_len] = '\0';
+  output_len++;
+
+  /* Free up the TSIOBuffer that we used to print out the header */
+  TSIOBufferReaderFree(reader);
+  TSIOBufferDestroy(output_buffer);
+
+  return output_string;
+}
+
 bool
 FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostringstream &output)
 {
@@ -446,6 +523,66 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
     }
 
     if (fcgiProcessRecord(&beg_buf, end_buf, _headerRecord) == FCGI_PROCESS_DONE) {
+      if (first_chunk) {
+        string start = std::string((char *)_headerRecord->content, _headerRecord->length);
+        string end("\r\n\r\n");
+        int foundPos = start.find(end), cpyLen = 0;
+        char *buff;
+        buff = (char *)TSmalloc(sizeof(char) * (foundPos + 4));
+        if (foundPos != -1) {
+          cpyLen       = start.copy(buff, foundPos + 4, 0);
+          buff[cpyLen] = '\0';
+        }
+
+        char *start1;
+        start1 = buff;
+        const char *endPtr;
+        endPtr = buff + strlen(buff) + 1;
+        char *temp;
+        TSMLoc mime_hdr_loc1 = (TSMLoc) nullptr;
+        TSParseResult retval;
+        TSMimeParser parser = TSMimeParserCreate();
+        TSMBuffer bufp      = TSMBufferCreate();
+        TSMimeHdrCreate(bufp, &mime_hdr_loc1);
+        if ((retval = TSMimeHdrParse(parser, bufp, mime_hdr_loc1, (const char **)&start1, endPtr)) == TS_PARSE_ERROR) {
+          TSDebug(PLUGIN_NAME, "[FCGIClientRequest:%s] Hdr Parse Error.", __FUNCTION__);
+        } else {
+          if (retval == TS_PARSE_DONE) {
+            temp = convert_mime_hdr_to_string(bufp, mime_hdr_loc1); // Implements TSMimeHdrPrint.
+            if (strcmp(buff, temp) == 0) {
+              Headers h(bufp, mime_hdr_loc1);
+              string key("Status");
+              if (h.isInitialized()) {
+                atscppapi::header_field_iterator it = h.find(key);
+                if (it != h.end()) {
+                  atscppapi::HeaderField hf(*it);
+                  string value = hf.values(","); // delimeter for header values
+                  output << HTTP_VERSION_STRINGS[HTTP_VERSION_1_1] << " ";
+                  output << value.c_str() << "\r\n";
+                } else {
+                  output << "HTTP/1.0 200 OK\r\n";
+                }
+                // it = h.begin();
+                // for (it = h.begin(); it != h.end(); ++it) {
+                //   atscppapi::HeaderField hf(*it);
+                //   std::cout << "Name => " << hf.name() << "Value => " << hf.values() << std::endl;
+                // }
+              }
+            } else {
+              TSDebug(PLUGIN_NAME, "[FCGIClientRequest:%s] Incorrect Parsing.", __FUNCTION__);
+              output << "HTTP/1.0 200 OK\r\n";
+            }
+            TSfree(temp);
+          }
+        }
+
+        TSMimeHdrDestroy(bufp, mime_hdr_loc1);
+        TSHandleMLocRelease(bufp, TS_NULL_MLOC, mime_hdr_loc1);
+        TSMBufferDestroy(bufp);
+        TSMimeParserDestroy(parser);
+        TSfree(buff);
+        first_chunk = false;
+      }
       if (_headerRecord->header->type == FCGI_STDOUT) {
         output << std::string((const char *)_headerRecord->content, _headerRecord->length);
       }
@@ -455,7 +592,6 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
         return true;
       }
       if (_headerRecord->header->type == FCGI_END_REQUEST) {
-        // TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response complete. FCGI_END_REQUEST.*****\n\n", __FUNCTION__);
         return true;
       }
     }
@@ -468,10 +604,6 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
 bool
 FCGIClientRequest::fcgiDecodeRecordChunk(uchar *beg_buf, size_t remain, std::ostringstream &output)
 {
-  if (first_chunk) {
-    output << "HTTP/1.0 200 OK\r\n";
-    first_chunk = false;
-  }
   return fcgiProcessBuffer((uchar *)beg_buf, (uchar *)beg_buf + (size_t)remain, output);
 }
 
