@@ -56,9 +56,6 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
     server_connection->vc_ = (TSVConn)edata;
     server_connection->setState(ServerConnection::READY);
     TSDebug(PLUGIN_NAME, "%s: New Connection success, %p", __FUNCTION__, server_connection);
-    // TSDebug(PLUGIN_NAME, "vc_ : %p \t _contp: %p \tWriteIO.vio :%p \t ReadIO.vio :%p ",
-    //         server_connection->vc_, server_connection->contp(), server_connection->writeio.vio, server_connection->readio.vio);
-
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
     if (intercept) {
       intercept->setServerConn(server_connection);
@@ -79,8 +76,12 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_READ_READY: {
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
-    if (intercept && interceptTransferData(intercept, server_connection))
-      TSContCall(TSVIOContGet(server_connection->readio.vio), TS_EVENT_VCONN_READ_COMPLETE, server_connection->readio.vio);
+    if (intercept && interceptTransferData(intercept, server_connection)) {
+      server_connection->setState(ServerConnection::COMPLETE);
+      intercept->setResponseOutputComplete();
+      TSStatIntIncrement(InterceptGlobal::respBegId, 1);
+      // TSContCall(TSVIOContGet(server_connection->readio.vio), TS_EVENT_VCONN_READ_COMPLETE, server_connection->readio.vio);
+    }
   } break;
 
   case TS_EVENT_VCONN_READ_COMPLETE: {
@@ -112,6 +113,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
       server_connection->setState(ServerConnection::CLOSED);
       Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
       transaction.error("Internal server error");
+      intercept->setServerConn(nullptr);
     }
 
     server->connectionClosed(server_connection);
@@ -126,6 +128,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
       Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
       transaction.setStatusCode(HTTP_STATUS_BAD_GATEWAY);
       transaction.error("Internal server error");
+      intercept->setServerConn(nullptr);
     }
 
     server->connectionClosed(server_connection);
@@ -259,14 +262,7 @@ const uint
 Server::connect(ServerIntercept *intercept)
 {
   ServerConnection *conn = nullptr;
-  {
-    // #if ATS_FCGI_PROFILER
-    //     using namespace InterceptGlobal;
-    //     ats_plugin::ProfileTaker profile_taker1(&profiler, "connectConn", (std::size_t)&gServer, "B");
-    // #endif
-
-    conn = _connection_pool->getAvailableConnection();
-  }
+  conn                   = _connection_pool->getAvailableConnection();
   if (conn) {
     initiateBackendConnection(intercept, conn);
   } else {
@@ -297,28 +293,15 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
   transaction.addPlugin(intercept);
   transaction.resume();
-  // #if ATS_FCGI_PROFILER
-  //   using namespace InterceptGlobal;
-  //   ats_plugin::ProfileTaker profile_taker2(&profiler, "initiateBackendConnection", (std::size_t)&gServer, "B");
-  // #endif
-
   TSMutexLock(_reqId_mutex);
   const uint request_id = UniqueRequesID::getNext();
   TSMutexUnlock(_reqId_mutex);
 
   intercept->setRequestId(request_id);
   conn->setRequestId(request_id);
-  {
-    // #if ATS_FCGI_PROFILER
-    //     using namespace InterceptGlobal;
-    //     ats_plugin::ProfileTaker profile_taker3(&profiler, "connectInterceptList", (std::size_t)&gServer, "B");
-    // #endif
-
-    TSMutexLock(_intecept_mutex);
-    _intercept_list[request_id] = std::make_tuple(intercept, conn);
-    TSMutexUnlock(_intecept_mutex);
-  }
-
+  TSMutexLock(_intecept_mutex);
+  _intercept_list[request_id] = std::make_tuple(intercept, conn);
+  TSMutexUnlock(_intecept_mutex);
   if (conn->getState() != ServerConnection::READY) {
     TSDebug(PLUGIN_NAME, "[Server: %s] Setting up a new php Connection..", __FUNCTION__);
     conn->createConnection();

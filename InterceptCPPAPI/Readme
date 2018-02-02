@@ -106,6 +106,10 @@ Its configuration file can have 5 configurable options:
     CONFIG proxy.config.http.fcgi.host.server_ip  STRING 127.0.0.1
     CONFIG proxy.config.http.fcgi.host.server_port STRING 60000
     CONFIG proxy.config.http.fcgi.host.root_directory STRING /
+    CONFIG proxy.config.http.fcgi.host.min_connections INT 2
+    CONFIG proxy.config.http.fcgi.host.max_connections INT 16
+    CONFIG proxy.config.http.fcgi.host.max_requests INT 1000
+    CONFIG proxy.config.http.fcgi.host.request_queue_size INT 250
 
 Meaning of these configurable options:
     enabled
@@ -114,11 +118,18 @@ Meaning of these configurable options:
         hostname of the fcgi server in string format e.g localhost
     server_ip
         IP of the fcgi server machine in string format e.g 127.0.0.1
-    servre_port
+    server_port
         fcgi server port number in string format e.g 60000
     root_directory
         root directory path from where fcgi server will server resources/web_contents
-        
+    min_connections 
+        min number of connections plugin will open to the php server
+    max_connections
+        max number of connections plugin will make to the php server
+    max_requests
+        max number of requests per connection plugin will allow to the php server
+    request_queue_size
+        max requests queue size limit
 
 
 
@@ -144,3 +155,15 @@ $ > ./bin/php-fastcgi start      //this will start the server on port 60000
 
 Note: Place sample scripts from  ./examples/*  files to /var/www/ directory to access php scripts from browser. As php server uses default location as /var/www/html/*.php
 
+
+
+
+Using Profiler:
+    1. To use profiler, set the ATS_FCGI_PROFILER flag to true inside ats_mod_intercept.h file.
+
+    2. Place  below piece of code inside functions to record profiling.
+
+        #if ATS_FCGI_PROFILER
+            ats_plugin::ProfileTaker profile_taker(&profiler, "functinName", (std::size_t)&plugin, "B");
+        #endif
+        

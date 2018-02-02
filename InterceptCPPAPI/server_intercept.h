@@ -27,7 +27,6 @@ using namespace atscppapi;
 
 namespace ats_plugin
 {
-class ProfileTaker;
 class ServerConnection;
 class ServerIntercept : public InterceptPlugin
 {
@@ -40,9 +39,6 @@ public:
   {
     _server_conn        = nullptr;
     _txn                = static_cast<TSHttpTxn>(transaction.getAtsHandle());
-    profileTakerInput   = nullptr;
-    profileTakerOutput  = nullptr;
-    outputToDest        = nullptr;
     inputCompleteState  = false;
     outputCompleteState = false;
     TSDebug(PLUGIN_NAME, "ServerIntercept : Added Server intercept");
@@ -89,9 +85,6 @@ private:
   ServerConnection *_server_conn;
   string clientHeader, clientBody;
   bool inputCompleteState, outputCompleteState;
-
-  ProfileTaker *profileTakerInput, *profileTakerOutput, *outputToDest;
-  bool profInputFlag = false, profOutputFlag = false;
 };
 }
 #endif /*_SERVER_INTERCEPT_H_*/

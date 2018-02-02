@@ -11,7 +11,9 @@
 #include "fcgi_config.h"
 #include <atscppapi/GlobalPlugin.h>
 #include "server.h"
+#if ATS_FCGI_PROFILER
 #include "Profiler.h"
+#endif
 
 using namespace atscppapi;
 

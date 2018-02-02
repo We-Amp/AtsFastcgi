@@ -22,10 +22,6 @@ InterceptIOChannel::~InterceptIOChannel()
 void
 InterceptIOChannel::read(TSVConn vc, TSCont contp)
 {
-  // #if ATS_FCGI_PROFILER
-  //   using namespace InterceptGlobal;
-  //   ats_plugin::ProfileTaker profile_taker3(&profiler, "phpRead", (std::size_t)&gServer, "B");
-  // #endif
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
@@ -54,10 +50,6 @@ InterceptIOChannel::write(TSVConn vc, TSCont contp)
 void
 InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int data_size, bool endflag)
 {
-  // #if ATS_FCGI_PROFILER
-  //   using namespace InterceptGlobal;
-  //   ats_plugin::ProfileTaker profile_taker3(&profiler, "phpWrite", (std::size_t)&gServer, "B");
-  // #endif
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }

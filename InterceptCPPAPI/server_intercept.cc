@@ -26,11 +26,6 @@ using namespace ats_plugin;
 ServerIntercept::~ServerIntercept()
 {
   TSDebug(PLUGIN_NAME, "~ServerIntercept : Shutting down server intercept. _request_id: %d", _request_id);
-  if (outputToDest != nullptr) {
-    delete outputToDest;
-    outputToDest = nullptr;
-  }
-  // Server::server()->removeIntercept(_request_id);
   _txn = nullptr;
   TSStatIntIncrement(InterceptGlobal::respEndId, 1);
 }
@@ -38,14 +33,6 @@ ServerIntercept::~ServerIntercept()
 void
 ServerIntercept::consume(const string &data, InterceptPlugin::RequestDataType type)
 {
-  //   if (profInputFlag == false) {
-  //     profInputFlag = true;
-  // #if ATS_FCGI_PROFILER
-  //     using namespace InterceptGlobal;
-  //     TSDebug(PLUGIN_NAME, "[%s] New profile taker input side", __FUNCTION__);
-  //     profileTakerInput = new ProfileTaker(&profiler, "consume", (std::size_t)&gServer, "B");
-  // #endif
-  //   }
   if (type == InterceptPlugin::REQUEST_HEADER) {
     TSDebug(PLUGIN_NAME, "[ServerIntercept:%s] Read request header data.", __FUNCTION__);
     streamReqHeader(data);
@@ -88,13 +75,6 @@ ServerIntercept::handleInputComplete()
   } else {
     inputCompleteState = true;
   }
-
-  // #if ATS_FCGI_PROFILER
-  //   if (profileTakerInput) {
-  //     TSDebug(PLUGIN_NAME, "[%s] delete profile taker input side", __FUNCTION__);
-  //     delete profileTakerInput;
-  //   }
-  // #endif
 }
 
 void
@@ -109,32 +89,13 @@ ServerIntercept::resumeIntercept()
 void
 ServerIntercept::writeResponseChunkToATS(std::string &data)
 {
-  //   if (profOutputFlag == false) {
-  //     profOutputFlag = true;
-  // #if ATS_FCGI_PROFILER
-  //     using namespace InterceptGlobal;
-  //     TSDebug(PLUGIN_NAME, "[%s] New profile taker output side", __FUNCTION__);
-  //     profileTakerOutput = new ProfileTaker(&profiler, "writeResponseChunkToATS", (std::size_t)&gServer, "B");
-  // #endif
-  //   }
   InterceptPlugin::produce(data);
 }
 
 void
 ServerIntercept::setResponseOutputComplete()
 {
-  // #if ATS_FCGI_PROFILER
-  //   if (profileTakerOutput != nullptr) {
-  //     TSDebug(PLUGIN_NAME, "[%s] delete profile taker output side", __FUNCTION__);
-  //     delete profileTakerOutput;
-  //     profileTakerOutput = nullptr;
-  //   }
-  // #endif
   InterceptPlugin::setOutputComplete();
   outputCompleteState = true;
   Server::server()->removeIntercept(_request_id);
-#if ATS_FCGI_PROFILER
-  using namespace InterceptGlobal;
-  outputToDest = new ProfileTaker(&profiler, "RespOutputToDestructorCall", (std::size_t)&gServer, "B");
-#endif
 }

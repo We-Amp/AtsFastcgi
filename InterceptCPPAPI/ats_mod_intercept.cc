@@ -16,12 +16,14 @@
 #include "fcgi_config.h"
 #include "server_intercept.h"
 #include "server.h"
-#include "Profiler.h"
-
 #include <regex>
+
+#if ATS_FCGI_PROFILER
+#include "Profiler.h"
 #define CONFIGURU_IMPLEMENTATION 1
 #include "configuru.hpp"
 using namespace configuru;
+#endif
 
 using namespace atscppapi;
 
