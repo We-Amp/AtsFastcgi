@@ -21,7 +21,7 @@ public:
   uint isQueueEmpty();
   uint getSize();
   uint addToQueue(ServerIntercept *);
-  ServerIntercept *removeFromQueue();
+  ServerIntercept *popFromQueue();
 };
 }
 #endif /*REQUEST_QUEUE_H*/
