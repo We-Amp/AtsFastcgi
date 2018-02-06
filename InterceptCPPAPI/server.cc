@@ -187,27 +187,30 @@ Server::removeIntercept(uint request_id)
     serv_conn->releaseFCGIClient();
     TSDebug(PLUGIN_NAME, "[Server:%s] Reset and Add connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
             pendingReqQueue->getSize());
+
     if (serv_conn->requestCount() < serv_conn->maxRequests()) {
-      if (!pendingReqQueue->isQueueEmpty()) {
-        ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
+      ServerIntercept *intercept = pendingReqQueue->popFromQueue();
+      if (intercept) {
         TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
         initiateBackendConnection(intercept, serv_conn);
-      } else {
-        TSDebug(PLUGIN_NAME, "[Server:%s] Queue Empty. Reusing connection.Max_req: %d ,Req_count: %d", __FUNCTION__,
-                serv_conn->maxRequests(), serv_conn->requestCount());
-        _connection_pool->reuseConnection(serv_conn);
+        return;
       }
-    } else {
-      // destroy the connection and setup new conn to process pending list
-      TSDebug(PLUGIN_NAME, "[Server:%s] Max Requests reached. Max_req: %d ,Req_count: %d", __FUNCTION__, serv_conn->maxRequests(),
-              serv_conn->requestCount());
-      serv_conn->setState(ServerConnection::CLOSED);
-      connectionClosed(serv_conn);
-      if (!pendingReqQueue->isQueueEmpty()) {
-        TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
-        ServerIntercept *intercept = pendingReqQueue->removeFromQueue();
-        connect(intercept);
-      }
+
+      TSDebug(PLUGIN_NAME, "[Server:%s] Queue Empty. Reusing connection.Max_req: %d ,Req_count: %d", __FUNCTION__,
+              serv_conn->maxRequests(), serv_conn->requestCount());
+      _connection_pool->reuseConnection(serv_conn);
+      return;
+    }
+
+    // destroy the connection and setup new conn to process pending list
+    TSDebug(PLUGIN_NAME, "[Server:%s] Max Requests reached. Max_req: %d ,Req_count: %d", __FUNCTION__, serv_conn->maxRequests(),
+            serv_conn->requestCount());
+    serv_conn->setState(ServerConnection::CLOSED);
+    connectionClosed(serv_conn);
+    ServerIntercept *intercept = pendingReqQueue->popFromQueue();
+    if (intercept) {
+      TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
+      connect(intercept);
     }
   }
 }
