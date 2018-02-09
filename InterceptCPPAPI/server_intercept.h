@@ -32,13 +32,15 @@ class ServerIntercept : public InterceptPlugin
 {
 public:
   int headCount = 0, bodyCount = 0, emptyCount = 0;
+  bool dataBuffered;
+  bool serverDataBuffered;
+  string serverResponse;
   TSHttpTxn _txn;
-  bool connInuse = false;
-
   ServerIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
   {
-    _server_conn        = nullptr;
     _txn                = static_cast<TSHttpTxn>(transaction.getAtsHandle());
+    dataBuffered        = false;
+    serverDataBuffered  = false;
     inputCompleteState  = false;
     outputCompleteState = false;
     TSDebug(PLUGIN_NAME, "ServerIntercept : Added Server intercept");
@@ -51,8 +53,8 @@ public:
   void streamReqHeader(const string &data);
   void streamReqBody(const string &data);
 
-  void writeResponseChunkToATS(std::string &data);
-  void setResponseOutputComplete();
+  bool writeResponseChunkToATS(std::string &data);
+  bool setResponseOutputComplete();
 
   void
   setRequestId(uint request_id)
@@ -60,19 +62,11 @@ public:
     _request_id = request_id;
   }
 
-  void
-  setServerConn(ServerConnection *conn)
-  {
-    _server_conn = conn;
-  }
-
   uint
   requestId()
   {
     return _request_id;
   }
-
-  void resumeIntercept();
 
   bool
   getOutputCompleteState()
@@ -82,8 +76,8 @@ public:
 
 private:
   uint _request_id;
-  ServerConnection *_server_conn;
   string clientHeader, clientBody;
+
   bool inputCompleteState, outputCompleteState;
 };
 }

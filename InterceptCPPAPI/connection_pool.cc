@@ -8,8 +8,9 @@ using namespace ats_plugin;
 ConnectionPool::ConnectionPool(Server *server, TSEventFunc funcp)
   : _server(server), _funcp(funcp), _availableConn_mutex(TSMutexCreate()), _conn_mutex(TSMutexCreate())
 {
+  // TODO: For now we are setting maxConn as hard coded values
   ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
-  _maxConn                              = gConfig->getMaxConnLength();
+  _maxConn                              = gConfig->getMaxConnLength() / 4;
 }
 
 ConnectionPool::~ConnectionPool()
@@ -28,18 +29,13 @@ ConnectionPool::checkAvailability()
 ServerConnection *
 ConnectionPool::getAvailableConnection()
 {
-  TSMutexLock(_availableConn_mutex);
-  if (!_available_connections.empty() && _connections.size() == _maxConn) {
-    TSDebug(PLUGIN_NAME, "%s: available connections %ld", __FUNCTION__, _available_connections.size());
+  if (!_available_connections.empty() && _connections.size() <= _maxConn) {
     ServerConnection *conn = _available_connections.front();
     _available_connections.pop_front();
-    TSMutexUnlock(_availableConn_mutex);
-    // TODO ASSERT(conn->getState() == ServerConnection::READY)
     conn->setState(ServerConnection::READY);
-    TSDebug(PLUGIN_NAME, "%s: Connection from available pool, %p", __FUNCTION__, conn);
+    TSDebug(PLUGIN_NAME, "%s: available connections %ld. Connection from available pool, %p", __FUNCTION__,
+            _available_connections.size(), conn);
     return conn;
-  } else {
-    TSMutexUnlock(_availableConn_mutex);
   }
 
   if (_connections.size() >= _maxConn) {
@@ -55,9 +51,7 @@ ConnectionPool::getAvailableConnection()
 void
 ConnectionPool::addConnection(ServerConnection *connection)
 {
-  TSMutexLock(_conn_mutex);
   _connections.push_back(connection);
-  TSMutexUnlock(_conn_mutex);
 }
 
 void
@@ -67,23 +61,14 @@ ConnectionPool::reuseConnection(ServerConnection *connection)
   connection->writeio.readEnable = false;
 
   connection->setState(ServerConnection::READY);
-  TSMutexLock(_availableConn_mutex);
   _available_connections.push_back(connection);
-  TSMutexUnlock(_availableConn_mutex);
-
   TSDebug(PLUGIN_NAME, "%s: Connection added, available connections %ld", __FUNCTION__, _available_connections.size());
 }
 
 void
 ConnectionPool::connectionClosed(ServerConnection *connection)
 {
-  TSMutexLock(_availableConn_mutex);
   _available_connections.remove(connection);
-  TSMutexUnlock(_availableConn_mutex);
-
-  TSMutexLock(_conn_mutex);
   _connections.remove(connection);
-  TSMutexUnlock(_conn_mutex);
-
   delete connection;
 }

@@ -9,6 +9,7 @@ namespace ats_plugin
 {
 class Server;
 class FCGIClientRequest;
+class ServerIntercept;
 struct ServerConnectionInfo;
 struct InterceptIOChannel {
   TSVIO vio;
@@ -68,7 +69,7 @@ public:
     return _req_count;
   }
 
-  void createFCGIClient(TSHttpTxn txn);
+  void createFCGIClient(ServerIntercept *intercept);
   void releaseFCGIClient();
   FCGIClientRequest *
   fcgiRequest()

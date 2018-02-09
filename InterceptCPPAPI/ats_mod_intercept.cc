@@ -31,101 +31,65 @@ using std::cout;
 using std::endl;
 using std::string;
 
-/*
- * You should always take advantage of the LOG_LEVEL_NO_LOG,LOG_DEBUG, LOG_INFO,
- * and LOG_ERROR
- * macros available in Logger.h, they are easy to use as you can see below
- * and will provide detailed information about the logging site such as
- * filename, function name, and line number of the message
- */
 namespace InterceptGlobal
 {
 GlobalPlugin *plugin;
 ats_plugin::InterceptPluginData *plugin_data;
 ats_plugin::Server *gServer;
-int reqBegId, reqEndId, respBegId, respEndId;
+int reqBegId, reqEndId, respBegId, respEndId, threadCount, phpConnCount;
+thread_local pthread_key_t threadKey = 0;
 #if ATS_FCGI_PROFILER
 ats_plugin::Profiler profiler;
 #endif
 }
-
 // For experimental purpose to keep stats of plugin request/response
 const char reqBegName[]  = "plugin." PLUGIN_NAME ".reqCountBeg";
 const char reqEndName[]  = "plugin." PLUGIN_NAME ".reqCountEnd";
 const char respBegName[] = "plugin." PLUGIN_NAME ".respCountBeg";
 const char respEndName[] = "plugin." PLUGIN_NAME ".respCountEnd";
+const char threadName[]  = "plugin." PLUGIN_NAME ".threadCount";
+const char phpConnName[] = "plugin." PLUGIN_NAME ".phpConnCount";
 
 using namespace InterceptGlobal;
 
 class InterceptGlobalPlugin : public GlobalPlugin
 {
 public:
-  InterceptGlobalPlugin() : GlobalPlugin(true) { GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS); }
+  InterceptGlobalPlugin() : GlobalPlugin(true)
+  {
+    GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS);
+    // GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS_PRE_REMAP);
+  }
+  // handleReadRequestHeaders
+  // handleReadRequestHeadersPreRemap
   void
   handleReadRequestHeaders(Transaction &transaction) override
   {
+    if (static_cast<TSHttpTxn>(transaction.getAtsHandle()) == nullptr) {
+      TSDebug(PLUGIN_NAME, "Invalid Transaction.");
+      return;
+    }
     string path = transaction.getClientRequest().getUrl().getPath();
-
-    // std::cout << "URL Path:" << path << std::endl;
     // TODO: Regex based url selection
     std::smatch urlMatch;
     // std::regex e(".*.[wp*|php|js|css|scss|png|gif](p{2})?");
     std::regex e(".*");
     while (std::regex_search(path, urlMatch, e)) {
-      for (auto x : urlMatch)
-        std::cout << x << " " << std::endl;
-      // path = urlMatch.suffix().str();
-      // std::cout << "Path:" << path << std::endl;
       break;
     }
-    // std::cout << "UrlMatch" << urlMatch.str() << std::endl;
-    // #if ATS_FCGI_PROFILER
-    //     // Intentionally written this piece of code to record profiler stats in a file.
-    //     if (path.find("_profilerStats") != string::npos) {
-    //       std::cout << "Generating Dump file." << std::endl;
-    //       auto p = profiler.profiles();
-    //       profiler.profileLength();
-    //       std::vector<ats_plugin::Profile>::iterator it;
-    //       // Config resultObj = Config::object();
-    //       Config resultArr = Config::array();
-
-    //       for (it = p.begin(); it != p.end(); it++) {
-    //         // std::cout << "start time: " << it->start_time() << std::endl;
-    //         // std::cout << "end time: " << it->end_time() << std::endl;
-    //         // std::cout << "thread id: " << it->thread_id() << std::endl;
-    //         // std::cout << "Task Name: " << it->task_name() << std::endl;
-    //         Config cfg = Config::object();
-    //         cfg["ts"]  = it->start_time();
-    //         // cfg["end_time"] = it->end_time();
-    //         // cfg["dur"]  = it->end_time() - it->start_time();
-    //         cfg["tid"]  = std::to_string(it->thread_id());
-    //         cfg["pid"]  = it->process_id();
-    //         cfg["name"] = it->task_name();
-    //         // cfg["id"]   = std::to_string(it->object_id());
-    //         cfg["ph"] = it->obj_stage();
-
-    //         resultArr.push_back(cfg);
-    //       }
-    //       // resultObj["traceEvents"] = resultArr;
-    //       // std::string json = dump_string(resultArr, JSON);
-    //       dump_file("/tmp/output.json", resultArr, JSON);
-    //       // std::ofstream example_file;
-    //       // example_file.open("./example.json");
-    //       // example_file << json;
-    //       // example_file.close();
-    //     }
-    // #endif
 
     // if (path.find("php") != string::npos) {
     if (path.compare(urlMatch.str()) == 0) {
-#if ATS_FCGI_PROFILER
-      profiler.set_record_enabled(true);
-      ats_plugin::ProfileTaker profile_taker(&profiler, "handleReadRequestHeaders", (std::size_t)&plugin, "B");
-#endif
-
       TSStatIntIncrement(reqBegId, 1);
       auto intercept = new ats_plugin::ServerIntercept(transaction);
+
+      if (threadKey == 0) {
+        // setup thread local storage
+        while (!gServer->setupThreadLocalStorage())
+          ;
+      }
       gServer->connect(intercept);
+
     } else {
       transaction.resume();
     }
@@ -188,17 +152,41 @@ TSPluginInit(int argc, const char *argv[])
 
     TSError("[%s] %s registered with id %d", PLUGIN_NAME, respEndName, respEndId);
 
+    if (TSStatFindName(threadName, &threadCount) == TS_ERROR) {
+      threadCount = TSStatCreate(threadName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+      if (threadCount == TS_ERROR) {
+        TSError("[%s] failed to register '%s'", PLUGIN_NAME, threadName);
+        return;
+      }
+    }
+
+    TSError("[%s] %s registered with id %d", PLUGIN_NAME, threadName, threadCount);
+
+    if (TSStatFindName(phpConnName, &phpConnCount) == TS_ERROR) {
+      phpConnCount = TSStatCreate(phpConnName, TS_RECORDDATATYPE_INT, TS_STAT_NON_PERSISTENT, TS_STAT_SYNC_SUM);
+      if (phpConnCount == TS_ERROR) {
+        TSError("[%s] failed to register '%s'", PLUGIN_NAME, phpConnName);
+        return;
+      }
+    }
+
+    TSError("[%s] %s registered with id %d", PLUGIN_NAME, phpConnName, phpConnCount);
+
 #if DEBUG
     TSReleaseAssert(reqBegId != TS_ERROR);
     TSReleaseAssert(reqEndId != TS_ERROR);
     TSReleaseAssert(respBegId != TS_ERROR);
     TSReleaseAssert(respEndId != TS_ERROR);
+    TSReleaseAssert(threadCount != TS_ERROR);
+    TSReleaseAssert(phpConnCount != TS_ERROR);
 #endif
     // Set an initial value for our statistic.
     TSStatIntSet(reqBegId, 0);
     TSStatIntSet(reqEndId, 0);
     TSStatIntSet(respBegId, 0);
     TSStatIntSet(respEndId, 0);
+    TSStatIntSet(threadCount, 0);
+    TSStatIntSet(phpConnCount, 0);
 
   } else {
     TSDebug(PLUGIN_NAME, " plugin is disabled.");

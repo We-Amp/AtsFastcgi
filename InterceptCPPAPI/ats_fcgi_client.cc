@@ -53,7 +53,6 @@ FCGIClientRequest::FCGIClientRequest(int request_id, TSHttpTxn txn)
   // printFCGIRequestHeaders();
   string str("POST"), value;
   if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
-    std::cout << "Inside Post" << std::endl;
     Transaction &transaction = utils::internal::getTransaction(state_->txn_);
     Headers &h               = transaction.getClientRequest().getHeaders();
 
@@ -97,6 +96,15 @@ FCGIClientRequest::~FCGIClientRequest()
   delete state_;
 }
 
+bool
+endsWith(const std::string &mainStr, const std::string &toMatch)
+{
+  if (mainStr.size() >= toMatch.size() && mainStr.compare(mainStr.size() - toMatch.size(), toMatch.size(), toMatch) == 0)
+    return true;
+  else
+    return false;
+}
+
 map<string, string>
 FCGIClientRequest::GenerateFcgiRequestHeaders()
 {
@@ -107,30 +115,33 @@ FCGIClientRequest::GenerateFcgiRequestHeaders()
     atscppapi::header_field_iterator it = h.begin();
     for (it = h.begin(); it != h.end(); ++it) {
       atscppapi::HeaderField hf(*it);
-      // std::cout << "Name => " << hf.name() << "Value => " << hf.values() << std::endl;
       std::string str = hf.name().c_str();
-      // if (str.compare("Host") == 0) {
       std::string http("HTTP_");
       std::locale loc;
 
       for (std::string::size_type i = 0; i < str.length(); ++i) {
-        // std::cout << std::toupper(str[i], loc);
         http += std::toupper(str[i], loc);
       }
-      // std::cout << "\nName => " << http << "Value => " << hf.values() << std::endl;
       fcgiReqHeader[http] = hf.values();
-      // break;
-      //}
     }
   }
 
+  // if string ends with '/' char then request global html file to server
+  string index;
+  string requestScript = transaction.getClientRequest().getUrl().getPath();
+  if (endsWith(requestScript, "/")) {
+    ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
+    index                                 = gConfig->getHtml();
+    requestScript += index;
+  }
+
   fcgiReqHeader["DOCUMET_ROOT"]      = InterceptGlobal::plugin_data->getGlobalConfigObj()->getDocumentRootDir();
-  fcgiReqHeader["SCRIPT_FILENAME"]   = fcgiReqHeader["DOCUMET_ROOT"] + transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["SCRIPT_FILENAME"]   = fcgiReqHeader["DOCUMET_ROOT"] + requestScript;
   fcgiReqHeader["GATEWAY_INTERFACE"] = "FastCGI/1.1";
   fcgiReqHeader["REQUEST_METHOD"]    = HTTP_METHOD_STRINGS[transaction.getClientRequest().getMethod()];
-  fcgiReqHeader["SCRIPT_NAME"]       = "/" + transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["SCRIPT_NAME"]       = "/" + requestScript;
   fcgiReqHeader["QUERY_STRING"]      = transaction.getClientRequest().getUrl().getQuery();
-  fcgiReqHeader["REQUEST_URI"]       = "/" + transaction.getClientRequest().getUrl().getPath();
+  fcgiReqHeader["REQUEST_URI"]       = "/" + requestScript;
 
   // TODO map fcgiconfig with request headers.
   // atsfcgiconfig::FCGIParams *params      = fcgiGlobal::plugin_data->getGlobalConfigObj()->getFcgiParams();
@@ -144,8 +155,7 @@ FCGIClientRequest::GenerateFcgiRequestHeaders()
   fcgiReqHeader["SERVER_PORT"]     = "60000";
   fcgiReqHeader["SERVER_NAME"]     = "ATS 7.1.1";
   fcgiReqHeader["SERVER_PROTOCOL"] = "HTTP/1.1";
-  // fcgiReqHeader["CONTENT_TYPE"]      = "application/x-www-form-urlencoded";
-  fcgiReqHeader["FCGI_ROLE"] = "RESPONDER";
+  fcgiReqHeader["FCGI_ROLE"]       = "RESPONDER";
   return fcgiReqHeader;
 }
 
@@ -163,15 +173,16 @@ FCGIClientRequest::emptyParam()
 {
   string str("POST");
   state_->pBuffInc = state_->buff;
-  if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) == 0) {
-    TSDebug(PLUGIN_NAME, "empty Post Header Len: %ld ", state_->pBuffInc - state_->buff);
-  } else {
+  // if Method is not post, then writing empty FCGI_STDIN to buffer
+  if (str.compare(state_->requestHeaders["REQUEST_METHOD"]) != 0) {
     state_->postHeader                  = createHeader(FCGI_STDIN);
     state_->postHeader->contentLengthB0 = 0;
     state_->postHeader->contentLengthB1 = 0;
     serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
     state_->pBuffInc += sizeof(FCGI_Header);
+    return;
   }
+  TSDebug(PLUGIN_NAME, "empty Post Header Len: %ld ", state_->pBuffInc - state_->buff);
 }
 
 FCGI_Header *
@@ -231,7 +242,6 @@ FCGIClientRequest::createBeginRequest()
 void
 FCGIClientRequest::postBodyChunk()
 {
-  TSDebug(PLUGIN_NAME, "serializing post data");
   state_->pBuffInc   = state_->buff;
   int dataLen        = 0;
   state_->postHeader = createHeader(FCGI_STDIN);
@@ -248,7 +258,7 @@ FCGIClientRequest::postBodyChunk()
   state_->postHeader->contentLengthB1 = 0;
   serialize(state_->pBuffInc, state_->postHeader, sizeof(FCGI_Header));
   state_->pBuffInc += sizeof(FCGI_Header);
-  TSDebug(PLUGIN_NAME, "Post Header Len: %ld ", state_->pBuffInc - state_->buff);
+  TSDebug(PLUGIN_NAME, "Serialized Post Data. Post Header Len: %ld ", state_->pBuffInc - state_->buff);
 }
 
 unsigned char *
@@ -313,8 +323,6 @@ FCGIClientRequest::fcgiHeaderSetContentLen(FCGI_Header *h, uint16_t len)
 uint32_t
 FCGIClientRequest::fcgiHeaderGetContentLen(FCGI_Header *h)
 {
-  // TSDebug(PLUGIN_NAME, "[%s ] contentLengthB1: %d ,contentLengthB0 : %d ,After shieft content_len_hi: %d ", __FUNCTION__,
-  //         h->contentLengthB1, h->contentLengthB0, (h->contentLengthB1 << 8));
   return (h->contentLengthB1 << 8) + h->contentLengthB0;
 }
 
@@ -391,7 +399,6 @@ FCGIClientRequest::fcgiProcessContent(uchar **beg_buf, uchar *end_buf, FCGIRecor
     cpy_len = nb;
   }
 
-  //  printf("\nCpyLen: %d", cpy_len);
   memcpy(rec->content + offset, *beg_buf, cpy_len);
 
   if (tot_len <= nb) {
@@ -526,17 +533,15 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
       if (first_chunk) {
         string start = std::string((char *)_headerRecord->content, _headerRecord->length);
         string end("\r\n\r\n");
-        int foundPos = start.find(end), cpyLen = 0;
-        char *buff;
-        buff = (char *)TSmalloc(sizeof(char) * (foundPos + 4));
+        string headerString;
+        int foundPos = start.find(end);
         if (foundPos != -1) {
-          cpyLen       = start.copy(buff, foundPos + 4, 0);
-          buff[cpyLen] = '\0';
+          headerString = start.substr(0, foundPos + 4);
         }
-
-        char *start1;
-        start1 = buff;
+        const char *buff = headerString.c_str();
+        const char *start1;
         const char *endPtr;
+        start1 = buff;
         endPtr = buff + strlen(buff) + 1;
         char *temp;
         TSMLoc mime_hdr_loc1 = (TSMLoc) nullptr;
@@ -544,7 +549,7 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
         TSMimeParser parser = TSMimeParserCreate();
         TSMBuffer bufp      = TSMBufferCreate();
         TSMimeHdrCreate(bufp, &mime_hdr_loc1);
-        if ((retval = TSMimeHdrParse(parser, bufp, mime_hdr_loc1, (const char **)&start1, endPtr)) == TS_PARSE_ERROR) {
+        if ((retval = TSMimeHdrParse(parser, bufp, mime_hdr_loc1, &start1, endPtr)) == TS_PARSE_ERROR) {
           TSDebug(PLUGIN_NAME, "[FCGIClientRequest:%s] Hdr Parse Error.", __FUNCTION__);
         } else {
           if (retval == TS_PARSE_DONE) {
@@ -580,7 +585,6 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
         TSHandleMLocRelease(bufp, TS_NULL_MLOC, mime_hdr_loc1);
         TSMBufferDestroy(bufp);
         TSMimeParserDestroy(parser);
-        TSfree(buff);
         first_chunk = false;
       }
       if (_headerRecord->header->type == FCGI_STDOUT) {
@@ -592,6 +596,7 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
         return true;
       }
       if (_headerRecord->header->type == FCGI_END_REQUEST) {
+        TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response FCGI_END_REQUEST.*****\n\n", __FUNCTION__);
         return true;
       }
     }
