@@ -25,13 +25,15 @@ InterceptIOChannel::read(TSVConn vc, TSCont contp)
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
   }
-  this->iobuf  = TSIOBufferCreate();
-  this->reader = TSIOBufferReaderAlloc(this->iobuf);
-  this->vio    = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
-  if (this->vio == nullptr) {
-    TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
+  if (!this->iobuf) {
+    this->iobuf  = TSIOBufferCreate();
+    this->reader = TSIOBufferReaderAlloc(this->iobuf);
+    this->vio    = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
+    if (this->vio == nullptr) {
+      TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
+    }
+    TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
   }
-  TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
 }
 
 void
@@ -95,7 +97,7 @@ ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
     _req_count(0)
 {
   ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
-  _max_requests                         = gConfig->getMaxReqLength() - 1;
+  _max_requests                         = gConfig->getMaxReqLength();
   // createConnection();
 }
 

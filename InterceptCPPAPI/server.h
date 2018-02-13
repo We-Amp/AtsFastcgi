@@ -48,9 +48,9 @@ public:
   ServerIntercept *getIntercept(uint request_id);
   void removeIntercept(uint request_id);
 
-  void writeRequestHeader(uint request_id, ServerConnection *serv_conn);
-  void writeRequestBody(uint request_id, ServerConnection *serv_conn, const std::string &data);
-  void writeRequestBodyComplete(uint request_id, ServerConnection *serv_conn);
+  bool writeRequestHeader(uint request_id);
+  bool writeRequestBody(uint request_id, const std::string &data);
+  bool writeRequestBodyComplete(uint request_id);
 
   Server(Server const &) = delete;
   void operator=(Server const &) = delete;
