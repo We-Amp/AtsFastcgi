@@ -10,7 +10,7 @@ ConnectionPool::ConnectionPool(Server *server, TSEventFunc funcp)
 {
   // TODO: For now we are setting maxConn as hard coded values
   ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
-  _maxConn                              = gConfig->getMaxConnLength() / 4;
+  _maxConn                              = gConfig->getMaxConnLength() / 6;
 }
 
 ConnectionPool::~ConnectionPool()
@@ -29,7 +29,9 @@ ConnectionPool::checkAvailability()
 ServerConnection *
 ConnectionPool::getAvailableConnection()
 {
-  if (!_available_connections.empty() && _connections.size() <= _maxConn) {
+  TSMutexLock(_availableConn_mutex);
+  if (!_available_connections.empty() && _connections.size() >= _maxConn) {
+    TSDebug(PLUGIN_NAME, "%s: available connections %ld", __FUNCTION__, _available_connections.size());
     ServerConnection *conn = _available_connections.front();
     _available_connections.pop_front();
     conn->setState(ServerConnection::READY);
