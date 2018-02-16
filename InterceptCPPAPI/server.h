@@ -59,7 +59,7 @@ public:
   void reuseConnection(ServerConnection *server_conn);
   void connectionClosed(ServerConnection *server_conn);
 
-  void reConnect(ServerConnection *server_conn, uint request_id);
+  void reConnect(uint request_id);
 
   ConnectionPool *
   getConnectionPool()

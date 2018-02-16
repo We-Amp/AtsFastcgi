@@ -28,12 +28,12 @@ InterceptIOChannel::read(TSVConn vc, TSCont contp)
   if (!this->iobuf) {
     this->iobuf  = TSIOBufferCreate();
     this->reader = TSIOBufferReaderAlloc(this->iobuf);
-    this->vio    = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
-    if (this->vio == nullptr) {
-      TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
-    }
-    TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
   }
+  this->vio = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
+  if (this->vio == nullptr) {
+    TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
+  }
+  TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
 }
 
 void

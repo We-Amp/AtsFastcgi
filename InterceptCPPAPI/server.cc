@@ -69,7 +69,7 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_NET_CONNECT_FAILED: {
     // Try reconnection with new connection.
     // TODO: Have to stop trying to reconnect after some tries
-    server->reConnect(server_connection, server_connection->requestId());
+    server->reConnect(server_connection->requestId());
     server->connectionClosed(server_connection);
     return TS_EVENT_NONE;
   } break;
@@ -108,6 +108,17 @@ handlePHPConnectionEvents(TSCont contp, TSEvent event, void *edata)
 
   case TS_EVENT_VCONN_EOS: {
     ServerIntercept *intercept = server->getIntercept(server_connection->requestId());
+    if (!server_connection->writeio.readEnable) {
+      TSDebug(PLUGIN_NAME, "[%s]: EOS Request Failed. _request_id: %d, connection: %p,maxConn: %d, requestCount: %d", __FUNCTION__,
+              server_connection->requestId(), server_connection, server_connection->maxRequests(),
+              server_connection->requestCount());
+
+      server->reConnect(server_connection->requestId());
+      server_connection->setState(ServerConnection::CLOSED);
+      server->connectionClosed(server_connection);
+      break;
+    }
+
     if (intercept && !intercept->getOutputCompleteState()) {
       TSDebug(PLUGIN_NAME, "[%s]: EOS intercept->setResponseOutputComplete", __FUNCTION__);
       server_connection->setState(ServerConnection::CLOSED);
@@ -191,25 +202,17 @@ Server::removeIntercept(uint request_id)
     TSDebug(PLUGIN_NAME, "[Server:%s] Reset and Add connection back to connection pool. ReqQueueLength:%d", __FUNCTION__,
             pendingReqQueue->getSize());
 
-    if (serv_conn->requestCount() < serv_conn->maxRequests()) {
-      ServerIntercept *intercept = pendingReqQueue->popFromQueue();
-      if (intercept) {
-        TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
-        initiateBackendConnection(intercept, serv_conn);
-        return;
-      }
-
+    if (serv_conn->maxRequests() > serv_conn->requestCount()) {
       TSDebug(PLUGIN_NAME, "[Server:%s] Queue Empty. Reusing connection.Max_req: %d ,Req_count: %d", __FUNCTION__,
               serv_conn->maxRequests(), serv_conn->requestCount());
       _connection_pool->reuseConnection(serv_conn);
-      return;
+    } else {
+      // destroy the connection and setup new conn to process pending list
+      TSDebug(PLUGIN_NAME, "[Server:%s] Max Requests reached. Max_req: %d ,Req_count: %d", __FUNCTION__, serv_conn->maxRequests(),
+              serv_conn->requestCount());
+      serv_conn->setState(ServerConnection::CLOSED);
+      connectionClosed(serv_conn);
     }
-
-    // destroy the connection and setup new conn to process pending list
-    TSDebug(PLUGIN_NAME, "[Server:%s] Max Requests reached. Max_req: %d ,Req_count: %d", __FUNCTION__, serv_conn->maxRequests(),
-            serv_conn->requestCount());
-    serv_conn->setState(ServerConnection::CLOSED);
-    connectionClosed(serv_conn);
     ServerIntercept *intercept = pendingReqQueue->popFromQueue();
     if (intercept) {
       TSDebug(PLUGIN_NAME, "[Server:%s] Processing pending list", __FUNCTION__);
@@ -218,6 +221,7 @@ Server::removeIntercept(uint request_id)
     return;
   }
   TSMutexLock(_intecept_mutex);
+  return;
 }
 
 bool
@@ -299,17 +303,18 @@ Server::connect(ServerIntercept *intercept)
 }
 
 void
-Server::reConnect(ServerConnection *server_conn, uint request_id)
+Server::reConnect(uint request_id)
 {
   ServerIntercept *intercept = getIntercept(request_id);
 
-  TSMutexLock(_intecept_mutex);
-  _intercept_list.erase(request_id);
-  TSMutexUnlock(_intecept_mutex);
-
   TSDebug(PLUGIN_NAME, "[Server:%s]: Initiating reconnection...", __FUNCTION__);
-  if (intercept)
-    connect(intercept);
+  if (intercept) {
+    TSMutexLock(_intecept_mutex);
+    _intercept_list.erase(request_id);
+    TSMutexUnlock(_intecept_mutex);
+    if (!intercept->clientAborted)
+      connect(intercept);
+  }
 }
 
 void
@@ -324,6 +329,7 @@ Server::initiateBackendConnection(ServerIntercept *intercept, ServerConnection *
   TSMutexLock(_intecept_mutex);
   _intercept_list[request_id] = std::make_tuple(intercept, conn);
   TSMutexUnlock(_intecept_mutex);
+
   if (conn->getState() != ServerConnection::READY) {
     TSDebug(PLUGIN_NAME, "[Server: %s] Setting up a new php Connection..", __FUNCTION__);
     conn->createConnection();
@@ -353,12 +359,10 @@ void
 Server::connectionClosed(ServerConnection *server_conn)
 {
   TSMutexLock(_intecept_mutex);
-
   auto itr = _intercept_list.find(server_conn->requestId());
   if (itr != _intercept_list.end()) {
     _intercept_list.erase(itr);
   }
-
   TSMutexUnlock(_intecept_mutex);
 
   _connection_pool->connectionClosed(server_conn);

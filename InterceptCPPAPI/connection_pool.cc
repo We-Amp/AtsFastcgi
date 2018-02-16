@@ -30,7 +30,7 @@ ConnectionPool::getAvailableConnection()
 {
   ServerConnection *conn = nullptr;
   TSMutexLock(_availableConn_mutex);
-  if (!_available_connections.empty() && _connections.size() == _maxConn) {
+  if (!_available_connections.empty() && _connections.size() >= _maxConn) {
     TSDebug(PLUGIN_NAME, "%s: available connections %ld", __FUNCTION__, _available_connections.size());
     conn = _available_connections.front();
     _available_connections.pop_front();
@@ -39,12 +39,8 @@ ConnectionPool::getAvailableConnection()
     TSDebug(PLUGIN_NAME, "%s: Connection from available pool, %p", __FUNCTION__, conn);
   }
 
-  if (conn == nullptr) {
-    if (_connections.size() >= _maxConn) {
-      TSDebug(PLUGIN_NAME, "%s: Max conn reached, need to queue, maxConn: %d", __FUNCTION__, _maxConn);
-      return nullptr;
-    }
-
+  if (_connections.size() < _maxConn) {
+    TSDebug(PLUGIN_NAME, "%s: Max conn reached, need to queue, maxConn: %d", __FUNCTION__, _maxConn);
     conn = new ServerConnection(_server, _funcp);
     addConnection(conn);
   }
