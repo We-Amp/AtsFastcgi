@@ -57,14 +57,18 @@ class InterceptGlobalPlugin : public GlobalPlugin
 public:
   InterceptGlobalPlugin() : GlobalPlugin(true)
   {
-    GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS);
-    // GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS_PRE_REMAP);
+    // GlobalPlugin::registerHook(Plugin::HOOK_READ_REQUEST_HEADERS);
+    GlobalPlugin::registerHook(Plugin::HOOK_CACHE_LOOKUP_COMPLETE);
   }
-  // handleReadRequestHeaders
-  // handleReadRequestHeadersPreRemap
+
   void
-  handleReadRequestHeaders(Transaction &transaction) override
+  handleReadCacheLookupComplete(Transaction &transaction) override
   {
+    if (transaction.getCacheStatus() == Transaction::CACHE_LOOKUP_HIT_FRESH) {
+      transaction.resume();
+      TSDebug(PLUGIN_NAME, " Cache hit.");
+      return;
+    }
     if (static_cast<TSHttpTxn>(transaction.getAtsHandle()) == nullptr) {
       TSDebug(PLUGIN_NAME, "Invalid Transaction.");
       return;

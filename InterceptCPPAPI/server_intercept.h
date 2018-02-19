@@ -32,13 +32,14 @@ class ServerIntercept : public InterceptPlugin
 {
 public:
   int headCount = 0, bodyCount = 0, emptyCount = 0;
-  bool dataBuffered;
+  bool dataBuffered, clientAborted = false;
   bool serverDataBuffered;
   string serverResponse;
   TSHttpTxn _txn;
   ServerIntercept(Transaction &transaction) : InterceptPlugin(transaction, InterceptPlugin::SERVER_INTERCEPT)
   {
     _txn                = static_cast<TSHttpTxn>(transaction.getAtsHandle());
+    clientAborted       = false;
     dataBuffered        = false;
     serverDataBuffered  = false;
     inputCompleteState  = false;

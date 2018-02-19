@@ -27,6 +27,10 @@ ServerIntercept::~ServerIntercept()
 {
   TSDebug(PLUGIN_NAME, "~ServerIntercept : Shutting down server intercept._request_id: %d", _request_id);
   _txn = nullptr;
+  if (!outputCompleteState) {
+    clientAborted = true;
+    Server::server()->removeIntercept(_request_id);
+  }
   TSStatIntIncrement(InterceptGlobal::respEndId, 1);
 }
 
