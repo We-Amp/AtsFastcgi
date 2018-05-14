@@ -7,12 +7,12 @@
 #include <iterator>
 #include <iostream>
 
-static char DEFAULT_HOSTNAME[]      = "localhost";
-static char DEFAULT_SERVER_IP[]     = "127.0.0.1";
-static char DEFAULT_SERVER_PORT[]   = "60000";
-static char DEFAULT_INCLUDE_FILE[]  = "fastcgi.config";
-static char DEFAULT_DOCUMENT_ROOT[] = "/var/www/html/";
-
+static char DEFAULT_HOSTNAME[]        = "localhost";
+static char DEFAULT_SERVER_IP[]       = "127.0.0.1";
+static char DEFAULT_SERVER_PORT[]     = "60000";
+static char DEFAULT_INCLUDE_FILE[]    = "fastcgi.config";
+static char DEFAULT_DOCUMENT_ROOT[]   = "/var/www/html/";
+static char DEFAULT_HTML[]            = "index.php";
 static int DEFAULT_MIN_CONNECTION     = 4;
 static int DEFAULT_MAX_CONNECTION     = 10;
 static int DEFAULT_MAX_REQUEST        = 1000;
@@ -107,6 +107,19 @@ FcgiPluginConfig::setDocumentRootDir(char *str)
 {
   document_root = str;
 }
+
+TSMgmtString
+FcgiPluginConfig::getHtml()
+{
+  return html;
+}
+
+void
+FcgiPluginConfig::setHtml(char *str)
+{
+  html = str;
+}
+
 TSMgmtInt
 FcgiPluginConfig::getMinConnLength()
 {
@@ -190,6 +203,11 @@ fcgiHttpTxnConfigFind(const char *name, int length, FcgiConfigKey *conf, TSRecor
   }
   if (!strncmp(name, "proxy.config.http.fcgi.host.document_root", length)) {
     *conf = fcgiDocumentRoot;
+    *type = TS_RECORDDATATYPE_STRING;
+    return TS_SUCCESS;
+  }
+  if (!strncmp(name, "proxy.config.http.fcgi.host.html", length)) {
+    *conf = fcgiHtml;
     *type = TS_RECORDDATATYPE_STRING;
     return TS_SUCCESS;
   }
@@ -538,6 +556,7 @@ FcgiPluginConfig::initConfig(const char *fn)
     config->server_port        = DEFAULT_SERVER_PORT;
     config->include            = DEFAULT_INCLUDE_FILE;
     config->document_root      = DEFAULT_DOCUMENT_ROOT;
+    config->html               = DEFAULT_HTML;
     config->params             = new FCGIParams();
     config->max_connections    = DEFAULT_MAX_CONNECTION;
     config->min_connections    = DEFAULT_MIN_CONNECTION;
@@ -553,6 +572,7 @@ FcgiPluginConfig::initConfig(const char *fn)
     config->include                 = TSstrdup(global_config->getIncludeFilePath());
     config->params                  = new FCGIParams();
     config->document_root           = TSstrdup(global_config->getDocumentRootDir());
+    config->html                    = TSstrdup(global_config->getHtml());
     config->max_connections         = global_config->getMaxConnLength();
     config->min_connections         = global_config->getMinConnLength();
     config->max_requests            = global_config->getMaxReqLength();
@@ -708,6 +728,14 @@ FcgiPluginConfig::initConfig(const char *fn)
               config->document_root = TSstrdup(tok);
             }
             break;
+          case fcgiHtml:
+            if (4 == strlen(tok) && 0 == strcmp(tok, "NULL")) {
+              config->html = nullptr;
+            } else {
+              config->html = TSstrdup(tok);
+            }
+            break;
+
           case fcgiMinConnections: {
             config->min_connections = strtoll(tok, nullptr, 10);
             TSDebug(PLUGIN_NAME, "min_connections = %ld", config->min_connections);
@@ -741,6 +769,7 @@ FcgiPluginConfig::initConfig(const char *fn)
   TSDebug(PLUGIN_NAME, "server_port = %s", config->server_port);
   TSDebug(PLUGIN_NAME, "include = %s", config->include);
   TSDebug(PLUGIN_NAME, "document_root = %s", config->document_root);
+  TSDebug(PLUGIN_NAME, "html = %s", config->html);
   return config;
 }
 

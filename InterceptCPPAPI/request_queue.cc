@@ -44,12 +44,12 @@ RequestQueue::isQueueEmpty()
 uint
 RequestQueue::addToQueue(ServerIntercept *intercept)
 {
-  TSMutexLock(mutex);
+  // TSMutexLock(mutex);
   if (!isQueueFull()) {
     pending_list.push(intercept);
   }
   // TODO: handle queue full use case
-  TSMutexUnlock(mutex);
+  // TSMutexUnlock(mutex);
   return 1;
 }
 
@@ -57,11 +57,11 @@ ServerIntercept *
 RequestQueue::popFromQueue()
 {
   ServerIntercept *intercept = nullptr;
-  TSMutexLock(mutex);
+  // TSMutexLock(mutex);
   if (!pending_list.empty()) {
     intercept = pending_list.front();
     pending_list.pop();
   }
-  TSMutexUnlock(mutex);
+  // TSMutexUnlock(mutex);
   return intercept;
 }

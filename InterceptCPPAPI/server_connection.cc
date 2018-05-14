@@ -16,6 +16,7 @@ InterceptIOChannel::~InterceptIOChannel()
   if (this->iobuf) {
     TSIOBufferDestroy(this->iobuf);
   }
+  vio                 = nullptr;
   total_bytes_written = 0;
 }
 
@@ -24,16 +25,18 @@ InterceptIOChannel::read(TSVConn vc, TSCont contp)
 {
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
+    return;
   }
   if (!this->iobuf) {
     this->iobuf  = TSIOBufferCreate();
     this->reader = TSIOBufferReaderAlloc(this->iobuf);
+    this->vio    = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
+    if (this->vio == nullptr) {
+      TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
+      return;
+    }
+    TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
   }
-  this->vio = TSVConnRead(vc, contp, this->iobuf, INT64_MAX);
-  if (this->vio == nullptr) {
-    TSError("[InterceptIOChannel:%s] ERROR While reading from server", __FUNCTION__);
-  }
-  TSDebug(PLUGIN_NAME, "[InterceptIOChannel:%s] ReadIO.vio :%p ", __FUNCTION__, this->vio);
 }
 
 void
@@ -44,9 +47,9 @@ InterceptIOChannel::write(TSVConn vc, TSCont contp)
   TSReleaseAssert((this->reader = TSIOBufferReaderAlloc(this->iobuf)));
   if (TSVConnClosedGet(contp)) {
     TSError("[%s] Connection Closed...", __FUNCTION__);
-  } else {
-    this->vio = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
+    return;
   }
+  this->vio = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
 }
 
 void
@@ -54,6 +57,7 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
 {
   if (TSVConnClosedGet(vc)) {
     TSError("[InterceptIOChannel:%s] Connection Closed...", __FUNCTION__);
+    return;
   }
 
   if (!this->iobuf) {
@@ -62,6 +66,7 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
     this->vio    = TSVConnWrite(vc, contp, this->reader, INT64_MAX);
     if (this->vio == nullptr) {
       TSError("[InterceptIOChannel:%s] Error TSVIO returns null. ", __FUNCTION__);
+      return;
     }
   }
 
@@ -70,18 +75,19 @@ InterceptIOChannel::phpWrite(TSVConn vc, TSCont contp, unsigned char *buf, int d
     TSError("[InterceptIOChannel:%s] Error while writing to buffer! Attempted %d bytes but only "
             "wrote %d bytes",
             PLUGIN_NAME, data_size, num_bytes_written);
+    return;
   }
-  total_bytes_written += data_size;
-  TSDebug(PLUGIN_NAME, "writeio.vio :%p, Wrote %d bytes on PHP side", this->vio, total_bytes_written);
 
+  total_bytes_written += data_size;
   if (!endflag) {
     TSMutexLock(TSVIOMutexGet(vio));
     TSVIOReenable(this->vio);
     TSMutexUnlock(TSVIOMutexGet(vio));
-  } else {
-    this->readEnable = true;
-    TSDebug(PLUGIN_NAME, "[%s] Done: %ld \tnBytes: %ld", __FUNCTION__, TSVIONDoneGet(this->vio), TSVIONBytesGet(this->vio));
+    return;
   }
+
+  this->readEnable = true;
+  TSDebug(PLUGIN_NAME, "[%s] Done: %ld \tnBytes: %ld", __FUNCTION__, TSVIONDoneGet(this->vio), TSVIONBytesGet(this->vio));
 }
 
 ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
@@ -98,18 +104,19 @@ ServerConnection::ServerConnection(Server *server, TSEventFunc funcp)
 {
   ats_plugin::FcgiPluginConfig *gConfig = InterceptGlobal::plugin_data->getGlobalConfigObj();
   _max_requests                         = gConfig->getMaxReqLength();
-  // createConnection();
 }
 
 ServerConnection::~ServerConnection()
 {
-  TSDebug(PLUGIN_NAME, "Destroying server Connection Obj: %p", this);
+  TSDebug(PLUGIN_NAME, "Destroying server Connection Obj.ServerConn: %p ,request_id: %d,max_requests: %d, req_count: %d ", this,
+          _requestId, _max_requests, _req_count);
 
-  if (vc_ && _state == CLOSED) {
+  if (vc_) {
     TSVConnClose(vc_);
     vc_ = nullptr;
   }
-  readio.vio = writeio.vio = nullptr;
+  // XXX(oschaaf): check commmented line below.
+  // readio.vio = writeio.vio = nullptr;
   _requestId               = 0;
   _max_requests            = 0;
   _req_count               = 0;
@@ -121,10 +128,13 @@ ServerConnection::~ServerConnection()
 }
 
 void
-ServerConnection::createFCGIClient(TSHttpTxn txn)
+ServerConnection::createFCGIClient(ServerIntercept *intercept)
 {
   if (_state == READY || _state == COMPLETE) {
-    _fcgiRequest = new FCGIClientRequest(_requestId, txn);
+    Transaction &transaction = utils::internal::getTransaction(intercept->_txn);
+    transaction.addPlugin(intercept);
+    transaction.resume();
+    _fcgiRequest = new FCGIClientRequest(_requestId, intercept->_txn);
     _state       = INUSE;
     _req_count++;
   }
@@ -134,7 +144,9 @@ void
 ServerConnection::releaseFCGIClient()
 {
   if (_state == COMPLETE) {
-    TSDebug(PLUGIN_NAME, "[ServerConnection:%s] Release FCGI resource of Request :%d ", __FUNCTION__, _requestId);
+    TSDebug(PLUGIN_NAME,
+            "[ServerConnection:%s] Release FCGI resource of ServerConn: %p ,request_id: %d,max_requests: %d, req_count: %d ",
+            __FUNCTION__, this, _requestId, _max_requests, _req_count);
     delete _fcgiRequest;
     _fcgiRequest = nullptr;
     _state       = READY;
@@ -144,9 +156,7 @@ ServerConnection::releaseFCGIClient()
 void
 ServerConnection::createConnection()
 {
-  TSDebug(PLUGIN_NAME, "[ServerConnection:%s] : Create Connection called", __FUNCTION__);
   struct sockaddr_in ip_addr;
-
   unsigned short int a, b, c, d, p;
   char *arr  = InterceptGlobal::plugin_data->getGlobalConfigObj()->getServerIp();
   char *port = InterceptGlobal::plugin_data->getGlobalConfigObj()->getServerPort();
@@ -163,9 +173,6 @@ ServerConnection::createConnection()
   _contp     = TSContCreate(_funcp, TSMutexCreate());
   _sConnInfo = new ServerConnectionInfo(_server, this);
   TSContDataSet(_contp, _sConnInfo);
-
   // TODO: Need to handle return value of NetConnect
   TSNetConnect(_contp, (struct sockaddr const *)&ip_addr);
-
-  TSDebug(PLUGIN_NAME, "[ServerConnection:%s] : Data Set Contp: %p", __FUNCTION__, _contp);
 }
