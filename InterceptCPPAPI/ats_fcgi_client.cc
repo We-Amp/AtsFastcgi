@@ -135,8 +135,8 @@ FCGIClientRequest::GenerateFcgiRequestHeaders()
     requestScript += index;
   }
 
-  fcgiReqHeader["DOCUMET_ROOT"]      = InterceptGlobal::plugin_data->getGlobalConfigObj()->getDocumentRootDir();
-  fcgiReqHeader["SCRIPT_FILENAME"]   = fcgiReqHeader["DOCUMET_ROOT"] + requestScript;
+  fcgiReqHeader["DOCUMENT_ROOT"]      = InterceptGlobal::plugin_data->getGlobalConfigObj()->getDocumentRootDir();
+  fcgiReqHeader["SCRIPT_FILENAME"]   = fcgiReqHeader["DOCUMENT_ROOT"] + requestScript;
   fcgiReqHeader["GATEWAY_INTERFACE"] = "FastCGI/1.1";
   fcgiReqHeader["REQUEST_METHOD"]    = HTTP_METHOD_STRINGS[transaction.getClientRequest().getMethod()];
   fcgiReqHeader["SCRIPT_NAME"]       = "/" + requestScript;
