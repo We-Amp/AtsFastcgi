@@ -1,5 +1,5 @@
 #include "request_queue.h"
-#include "ats_mod_intercept.h"
+#include "ats_fastcgi.h"
 using namespace ats_plugin;
 
 RequestQueue::RequestQueue()

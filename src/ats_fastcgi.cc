@@ -1,5 +1,5 @@
 
-#include "ats_mod_intercept.h"
+#include "ats_fastcgi.h"
 
 #include <atscppapi/GlobalPlugin.h>
 #include <atscppapi/InterceptPlugin.h>

@@ -6,7 +6,7 @@
 #include "server_intercept.h"
 #include "server_connection.h"
 #include "connection_pool.h"
-#include "ats_mod_intercept.h"
+#include "ats_fastcgi.h"
 using namespace ats_plugin;
 
 uint UniqueRequesID::_id = 1;
@@ -40,7 +40,7 @@ interceptTransferData(ServerIntercept *intercept, ServerConnection *server_conn)
   std::string data = std::move(output.str());
   // TODO(oschaaf): check this if statement.
   if (data.size()) {
-    // std::cout << "Output: " << data << std::endl;
+    //std::cout << "Output: " << data << std::endl;
     intercept->writeResponseChunkToATS(data);
   }
   return responseStatus;

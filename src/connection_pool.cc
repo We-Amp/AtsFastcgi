@@ -1,5 +1,5 @@
 #include "ts/ts.h"
-#include "ats_mod_intercept.h"
+#include "ats_fastcgi.h"
 #include "connection_pool.h"
 #include "server_connection.h"
 #include "server.h"

@@ -20,7 +20,7 @@ Extract the file and set the flag  "C_Cpp.clang_format_path" to file path.
 -----------------------------------------------------------------------------
 Build and Install cmd = 
 
-#building CPP ats_mod_intercept.so
+#building CPP ats_fastcgi.so
 
 ```bash
 set -e
@@ -28,8 +28,8 @@ set -e
 # Update the path below for your system
 ats_dir="/path/to/trafficserver-source/"
 
-tsxs -o ats_mod_intercept.so \
-     -c ats_mod_intercept.cc \
+tsxs -o ats_fastcgi.so \
+     -c ats_fastcgi.cc \
      -L "${ats_dir}lib/" \
      -I "${ats_dir}lib" \
      -I "${ats_dir}lib/cppapi/include/" \
@@ -40,7 +40,7 @@ tsxs -o ats_mod_intercept.so \
 # (for the case where the sudo context doesn't know about tsxs)
 mtsxs=$(which tsxs)
 
-sudo $mtsxs -o ats_mod_intercept.so  -i 
+sudo $mtsxs -o ats_fastcgi.so  -i 
 ```
 
 OR Build and install using Makefile utility:
@@ -86,19 +86,19 @@ To view full state diagram, please view state.png
 
 CONFIGURATION
 
-To have trafficserver use this plugin, add a line for 'ats_mod_fcgi.so' in the 'plugin.config' file.
+To have trafficserver use this plugin, add a line for 'ats_fastcgi.so' in the 'plugin.config' file.
 The plugin can be configured with only 1 argument, which is location of its configuration file.
 
 Example plugin.config:
-    ats_mod_fcgi.so conf/ats_mod_fcgi/ats_mod_fcgi_XXXNAME.config
+    ats_fastcgi.so conf/ats_fastcgi/ats_fastcgi_XXXNAME.config
 
 This plugin can be added in remap.config as well.
 Thus, it can have different configurations or only be enabled/disabled for specific remap rules.
 If the only argument for this plugin is "0" or "1", it means just "disable" or "enable" this plugin with default config value.
 
 Example remap.config:
-    map http://no-collapse1.www.example.com/ http://www.example.com/ @plugin=ats_mod_fcgi.so @pparam=0
-    map http://no-collapse2.www.example.com/ http://www.example.com/ @plugin=ats_mod_fcgi.so @pparam=conf/collapsed_connection/disable.config
+    map http://no-collapse1.www.example.com/ http://www.example.com/ @plugin=ats_fastcgi.so @pparam=0
+    map http://no-collapse2.www.example.com/ http://www.example.com/ @plugin=ats_fastcgi.so @pparam=conf/collapsed_connection/disable.config
 
 Its configuration file can have 5 configurable options:
     CONFIG proxy.config.http.fcgi.enabled INT 1
@@ -159,7 +159,7 @@ Note: Place sample scripts from  ./examples/*  files to /var/www/ directory to a
 
 
 Using Profiler:
-    1. To use profiler, set the ATS_FCGI_PROFILER flag to true inside ats_mod_intercept.h file.
+    1. To use profiler, set the ATS_FCGI_PROFILER flag to true inside ats_fastcgi.h file.
 
     2. Place  below piece of code inside functions to record profiling.
 

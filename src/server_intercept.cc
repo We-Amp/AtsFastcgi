@@ -19,7 +19,7 @@
 #include "fcgi_config.h"
 #include "server.h"
 #include "server_connection.h"
-#include "ats_mod_intercept.h"
+#include "ats_fastcgi.h"
 using namespace atscppapi;
 using namespace ats_plugin;
 

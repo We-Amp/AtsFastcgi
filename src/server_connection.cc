@@ -2,7 +2,7 @@
 #include "server_connection.h"
 
 #include "ats_fcgi_client.h"
-#include "ats_mod_intercept.h"
+#include "ats_fastcgi.h"
 using namespace ats_plugin;
 InterceptIOChannel::InterceptIOChannel() : vio(nullptr), iobuf(nullptr), reader(nullptr), total_bytes_written(0), readEnable(false)
 {

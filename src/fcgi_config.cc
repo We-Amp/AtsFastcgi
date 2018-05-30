@@ -339,7 +339,7 @@ initFcgiParam(const char *fn, FCGIParams *fcgiParams)
   FcgiParamKey name;
   TSRecordDataType type, expected_type;
   if (nullptr == (file = TSfopen(fn, "r"))) {
-    TSError("[ats_mod_fcgi] Could not open fcgiParam.config file %s", fn);
+    TSError("[ats_fastcgi] Could not open fcgiParam.config file %s", fn);
   } else {
     while (nullptr != TSfgets(file, buf, sizeof(buf))) {
       char *ln, *tok;
@@ -357,26 +357,26 @@ initFcgiParam(const char *fn, FCGIParams *fcgiParams)
       }
 
       if (strncmp(tok, "fastcgi_param", 13)) {
-        TSError("[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
+        TSError("[ats_fastcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
         continue;
       }
 
       // Find the configuration name
       tok = strtok_r(nullptr, " \t", &ln);
       if (fcgiParamConfigFind(tok, -1, &name, &expected_type) != TS_SUCCESS) {
-        TSError("[ats_mod_fcgi] File %s, line %d: no ats_mod_fcgi.config name given", fn, line_num);
+        TSError("[ats_fastcgi] File %s, line %d: no ats_fastcgi.config name given", fn, line_num);
         continue;
       }
 
       // Find the type (INT or STRING only)
       tok = strtok_r(nullptr, " \t", &ln);
       if (TS_RECORDDATATYPE_NULL == (type = str_to_datatype(tok))) {
-        TSError("[ats_mod_fcgi] File %s, line %d: only INT and STRING types supported", fn, line_num);
+        TSError("[ats_fastcgi] File %s, line %d: only INT and STRING types supported", fn, line_num);
         continue;
       }
 
       if (type != expected_type) {
-        TSError("[ats_mod_fcgi] File %s, line %d: mismatch between provide data type, and expected type", fn, line_num);
+        TSError("[ats_fastcgi] File %s, line %d: mismatch between provide data type, and expected type", fn, line_num);
         continue;
       }
 
@@ -409,7 +409,7 @@ initFcgiParam(const char *fn, FCGIParams *fcgiParams)
       }
 
       if (!tok) {
-        TSError("[ats_mod_fcgi] File %s, line %d: the configuration must provide a value", fn, line_num);
+        TSError("[ats_fastcgi] File %s, line %d: the configuration must provide a value", fn, line_num);
         continue;
       }
       // Now store the new config
@@ -586,7 +586,7 @@ FcgiPluginConfig::initConfig(const char *fn)
       } else if (0 == strcmp("1", fn)) {
         config->enabled = true;
       } else {
-        TSError("[ats_mod_fcgi] Parameter '%s' ignored", fn);
+        TSError("[ats_fastcgi] Parameter '%s' ignored", fn);
       }
     } else {
       int line_num = 0;
@@ -595,7 +595,7 @@ FcgiPluginConfig::initConfig(const char *fn)
       FcgiConfigKey name;
       TSRecordDataType type, expected_type;
       if (nullptr == (file = TSfopen(fn, "r"))) {
-        TSError("[ats_mod_fcgi] Could not open config file %s", fn);
+        TSError("[ats_fastcgi] Could not open config file %s", fn);
       } else {
         while (nullptr != TSfgets(file, buf, sizeof(buf))) {
           char *ln, *tok;
@@ -613,28 +613,28 @@ FcgiPluginConfig::initConfig(const char *fn)
           }
 
           if (strncmp(tok, "CONFIG", 6)) {
-            TSError("[ats_mod_fcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
+            TSError("[ats_fastcgi] File %s, line %d: non-CONFIG line encountered", fn, line_num);
             continue;
           }
 
           // Find the configuration name
           tok = strtok_r(nullptr, " \t", &ln);
           if (fcgiHttpTxnConfigFind(tok, -1, &name, &expected_type) != TS_SUCCESS) {
-            TSError("[ats_mod_fcgi] File %s, line %d: no records.config name given", fn, line_num);
+            TSError("[ats_fastcgi] File %s, line %d: no records.config name given", fn, line_num);
             continue;
           }
 
           // Find the type (INT or STRING only)
           tok = strtok_r(nullptr, " \t", &ln);
           if (TS_RECORDDATATYPE_NULL == (type = str_to_datatype(tok))) {
-            TSError("[ats_mod_fcgi] File %s, line %d: only INT and STRING "
+            TSError("[ats_fastcgi] File %s, line %d: only INT and STRING "
                     "types supported",
                     fn, line_num);
             continue;
           }
 
           if (type != expected_type) {
-            TSError("[ats_mod_fcgi] File %s, line %d: mismatch between provide "
+            TSError("[ats_fastcgi] File %s, line %d: mismatch between provide "
                     "data type, and expected type",
                     fn, line_num);
             continue;
@@ -669,7 +669,7 @@ FcgiPluginConfig::initConfig(const char *fn)
           }
 
           if (!tok) {
-            TSError("[ats_mod_fcgi] File %s, line %d: the configuration must "
+            TSError("[ats_fastcgi] File %s, line %d: the configuration must "
                     "provide a value",
                     fn, line_num);
             continue;
