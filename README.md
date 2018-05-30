@@ -8,11 +8,7 @@ should be considered alpha, the plugin has seen 0 production mileage.
 ## Install
 
 ```bash
-git clone https://github.com/We-Amp/AtsFastcgi.git
-cd AtsFastCGI
-git checkout threadLocalStorage
-cd InterceptCPPAPI
-
+cd src
 ATS_SRC="/home/oschaaf/trafficserver"
 ATS_EXEC="/usr/local"
 make ATS_SRC="$ATS_SRC" ATS_EXEC="$ATS_EXEC"
@@ -25,7 +21,7 @@ sudo make ATS_SRC="$ATS_SRC" ATS_EXEC="$ATS_EXEC" install
 Add to plugin.config:
 ```
 # For possible settings, see below
-ats_mod_fcgi.so /usr/local/etc/trafficserver/fcgi.config
+ats_fastcgi.so /usr/local/etc/trafficserver/fcgi.config
 ```
 
 ## Starting CGI
@@ -68,17 +64,17 @@ phpinfo(INFO_MODULES);
 ## Settings
 
 ```
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.enabled INT 1
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.hostname STRING localhost
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.server_ip  STRING 127.0.0.1
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.server_port STRING 60000
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.include STRING etc/trafficserver/fastcgi.config
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.document_root STRING /var/www/
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.html STRING index.php
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.min_connections INT 2
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.max_connections INT 16
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.max_requests INT 1000
-ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.request_queue_size INT 250
+CONFIG proxy.config.http.fcgi.enabled INT 1
+CONFIG proxy.config.http.fcgi.host.hostname STRING localhost
+CONFIG proxy.config.http.fcgi.host.server_ip  STRING 127.0.0.1
+CONFIG proxy.config.http.fcgi.host.server_port STRING 60000
+CONFIG proxy.config.http.fcgi.host.include STRING etc/trafficserver/fastcgi.config
+CONFIG proxy.config.http.fcgi.host.document_root STRING /var/www/
+CONFIG proxy.config.http.fcgi.host.html STRING index.php
+CONFIG proxy.config.http.fcgi.host.min_connections INT 2
+CONFIG proxy.config.http.fcgi.host.max_connections INT 16
+CONFIG proxy.config.http.fcgi.host.max_requests INT 1000
+CONFIG proxy.config.http.fcgi.host.request_queue_size INT 250
 ```
 
-### Old/stale docs: https://github.com/We-Amp/AtsFastcgi/wiki/Building-ATS-FCGI-from-Source
+### Old (stale) docs: https://github.com/We-Amp/AtsFastcgi/wiki/Building-ATS-FCGI-from-Source
