@@ -594,6 +594,8 @@ FCGIClientRequest::fcgiProcessBuffer(uchar *beg_buf, uchar *end_buf, std::ostrin
         output << std::string((const char *)_headerRecord->content, _headerRecord->length);
       }
       if (_headerRecord->header->type == FCGI_STDERR) {
+	// XXX(oschaaf): we may want to treat this differently, but for now this will do.
+        output << "HTTP/1.0 500 Server Error\r\n\r\n";
         output << std::string((const char *)_headerRecord->content, _headerRecord->length);
         TSDebug(PLUGIN_NAME, "[ FCGIClientRequest:%s ] Response FCGI_STDERR.*****\n\n", __FUNCTION__);
         return true;
