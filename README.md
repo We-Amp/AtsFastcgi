@@ -1,11 +1,9 @@
 # AtsFastcgi -- a FastCGI plugin implementation for Apache Traffic Server.
 
-This plugin was presented at the ATS Euro-Tour summit in Cork. Its current state
+This plugin was presented at the ATS Euro-Tour summit in Cork [1]. Its current state
 should be considered alpha, the plugin has seen 0 production mileage.
 
-### Slides:
-
-https://docs.google.com/presentation/d/1kJ3hxbmflh8z4jsquPskeb1xNrLXHAYI2-OQXwwftZU/edit
+[1] Slides: https://docs.google.com/presentation/d/1kJ3hxbmflh8z4jsquPskeb1xNrLXHAYI2-OQXwwftZU/edit
 
 ## Install
 
