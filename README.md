@@ -1,10 +1,7 @@
-# AtsFastcgi
+# AtsFastcgi -- a FastCGI plugin implementation for Apache Traffic Server.
 
-## A FastCGI plugin implementation for Apache Traffic Server.
-
-For getting started see https://github.com/We-Amp/AtsFastcgi/wiki/Building-ATS-FCGI-from-Source
-
-## The plugin was presented at the ATS Euro-Tour summit in Cork. 
+This plugin was presented at the ATS Euro-Tour summit in Cork. Its current state
+should be considered alpha, the plugin has seen 0 production mileage.
 
 ### Slides:
 
@@ -85,3 +82,5 @@ ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.max_connections INT 16
 ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.max_requests INT 1000
 ats_mod_fcgi.config:CONFIG proxy.config.http.fcgi.host.request_queue_size INT 250
 ```
+
+### Old/stale docs: https://github.com/We-Amp/AtsFastcgi/wiki/Building-ATS-FCGI-from-Source
